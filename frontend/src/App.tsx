@@ -2,6 +2,9 @@ import { BrowserRouter, Link, Route, Routes } from 'react-router'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireRole, RootRedirect } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
+import { EmployeeCreatePage } from './pages/admin/EmployeeCreatePage'
+import { EmployeeDetailPage } from './pages/admin/EmployeeDetailPage'
+import { EmployeeListPage } from './pages/admin/EmployeeListPage'
 import { MyProfilePage } from './pages/MyProfilePage'
 
 function NotFound() {
@@ -26,7 +29,9 @@ function App() {
             <Route path="/me" element={<MyProfilePage />} />
           </Route>
           <Route element={<RequireRole role="ADMIN" />}>
-            <Route path="/admin" element={<p className="text-sm text-gray-500">관리자 화면 (준비 중)</p>} />
+            <Route path="/admin" element={<EmployeeListPage />} />
+            <Route path="/admin/employees/new" element={<EmployeeCreatePage />} />
+            <Route path="/admin/employees/:employeeNo" element={<EmployeeDetailPage />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
