@@ -212,6 +212,7 @@ const g60 = recs.filter((r) => endpoint(r) === 'GET 상세' && r.timeoutMs === 6
   const ok = g60.filter(isOk).map((r) => r.latencyMs).sort((a, b) => a - b)
   const any = g60.filter((r) => r.latencyMs !== undefined).map((r) => r.latencyMs).sort((a, b) => a - b)
   out.push(`- 60s 구간 GET 상세 n=${g60.length}. 응답 최댓값(상태 무관) ${ms(any.at(-1) ?? null)}, 30.5초 초과 응답 ${any.filter((x) => x > 30_500).length}건, timeout ${g60.filter((r) => r.errorClass === 'timeout').length}건`)
+  out.push(`- 전체 응답(상태 무관) 지연: n=${any.length}, p50 ${ms(percentile(any, 50))}, p95 ${ms(percentile(any, 95))}, p99 ${ms(percentile(any, 99))}, 최댓값 ${ms(any.at(-1) ?? null)}`)
   out.push(`- 30초 넘게 걸린 응답의 상태: ${JSON.stringify(g60.filter((r) => r.latencyMs > 30_000).reduce((m, r) => ((m[r.outcome] = (m[r.outcome] ?? 0) + 1), m), {}))}\n`)
   out.push(table(['성공 응답 지연 ≤', ...[0.5, 1, 2, 3, 5, 10, 20, 30].map((t) => `${t}s`)], [
     ['누적 비율 (성공 n=' + ok.length + ')', ...[0.5, 1, 2, 3, 5, 10, 20, 30].map((t) => pct(ok.filter((x) => x <= t * 1000).length / ok.length))],
