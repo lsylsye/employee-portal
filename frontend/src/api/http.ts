@@ -23,7 +23,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (!res.ok) {
     const data = (await res.json().catch(() => null)) as { message?: string } | null
-    throw new ApiError(res.status, data?.message ?? `요청에 실패했습니다 (HTTP ${res.status})`)
+    throw new ApiError(res.status, data?.message ?? `요청을 처리하지 못했어요 (HTTP ${res.status})`)
   }
   if (res.status === 204) return undefined as T
   return (await res.json()) as T

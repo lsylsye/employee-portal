@@ -205,14 +205,14 @@ function sessionUser(): SessionUser | null {
 
 function requireRole(role: 'ADMIN' | 'EMPLOYEE'): SessionUser {
   const user = sessionUser()
-  if (!user) throw new ApiError(401, '로그인이 필요합니다.')
-  if (user.role !== role) throw new ApiError(403, '권한이 없습니다.')
+  if (!user) throw new ApiError(401, '로그인이 필요해요.')
+  if (user.role !== role) throw new ApiError(403, '권한이 없어요.')
   return user
 }
 
 function findEmployee(employeeNo: string): MockEmployee {
   const e = data().employees.find((x) => x.employeeNo === employeeNo)
-  if (!e) throw new ApiError(404, '직원을 찾을 수 없습니다.')
+  if (!e) throw new ApiError(404, '직원을 찾을 수 없어요.')
   return e
 }
 
@@ -221,7 +221,7 @@ function requireName(lastName: string, firstName: string) {
 }
 
 // 로그인 실패 메시지는 이유와 관계없이 하나 (DECISIONS 1)
-const LOGIN_FAILED = '아이디 또는 비밀번호가 올바르지 않습니다.'
+const LOGIN_FAILED = '아이디 또는 비밀번호가 올바르지 않아요.'
 
 export const mockApi: Api = {
   login: ({ username, password }) =>
@@ -307,9 +307,9 @@ export const mockApi: Api = {
     delay(() => {
       requireRole('ADMIN')
       const e = findEmployee(no)
-      if (statusOf(e) === 'RESIGNED') throw new ApiError(409, '퇴사한 직원은 조회할 수 없습니다.')
-      if (!e.birthDate) throw new ApiError(422, '생년월일이 확인되지 않아 조회할 수 없습니다.')
-      if (checksOf(no).some((c) => c.status === 'pending')) throw new ApiError(409, '진행 중인 조회가 있습니다.')
+      if (statusOf(e) === 'RESIGNED') throw new ApiError(409, '퇴사한 직원은 신원 조회를 할 수 없어요.')
+      if (!e.birthDate) throw new ApiError(422, '생년월일이 확인되지 않아 신원 조회를 할 수 없어요.')
+      if (checksOf(no).some((c) => c.status === 'pending')) throw new ApiError(409, '진행 중인 조회가 있어요.')
       const c = bg(data().nextBgId++, no, Math.random() < 0.8 ? 'clear' : 'flagged', Date.now(), null)
       data().checks.push(c)
       return toBgSummary(c)
@@ -318,7 +318,7 @@ export const mockApi: Api = {
     delay(() => {
       requireRole('ADMIN')
       const c = data().checks.find((x) => x.id === id)
-      if (!c) throw new ApiError(404, '조회 결과를 찾을 수 없습니다.')
+      if (!c) throw new ApiError(404, '조회 결과를 찾을 수 없어요.')
       settle(c)
       return {
         ...toBgSummary(c),
