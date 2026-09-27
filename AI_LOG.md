@@ -227,3 +227,25 @@
   - 인증 브랜치: 쿠키 Secure 속성 검토. 대부분 브라우저가 `localhost`를 안전한 주소로 취급해서 공통으로 둘 수도 있다.
 - Railway에 dev·staging 환경을 따로 두지 않는다. 서비스와 DB가 두 벌이 되고, "로컬 검증 → 브랜치 배포 → main 병합" 흐름이 이미 스테이징 역할을 한다.
 - 반대 선택(지금 local/dev 분리)의 장점: 환경별 차이가 파일로 미리 드러나고, 나중에 동작 차이가 생겨도 구조를 바꿀 필요가 없다.
+
+**배포 — main 병합과 Railway 첫 배포**
+- `chore/deploy-setup`이 PR 없이 main에 **fast-forward로 합쳐져** push되었다. Railway `production` 환경에서 `1b6315b`가 배포에 성공했다(GitHub deployment status로 확인).
+- AI가 발견해 지적한 것: 정한 규칙(PR, merge commit)과 다르다. 이번 브랜치는 커밋이 일직선이라 결과 코드는 같다.
+- **결정: 규칙대로 PR merge commit으로 병합한다(사용자 확정).** fast-forward와 squash는 쓰지 않는다.
+  - 근거(브랜치 전략과 같음): 브랜치 단위가 이력에 남아야 면접에서 "이 PR에서 무엇을 왜"를 보여줄 수 있다.
+  - 방법: GitHub PR에서 "Create a merge commit", 로컬이면 `git merge --no-ff`
+- 이 기록은 main에 직접 커밋하지 않고 다음 브랜치의 첫 커밋에 포함한다.
+
+**배포 검증** — https://employee-portal-production-fa4a.up.railway.app (로컬 검증과 같은 항목)
+
+| 요청 | 결과 |
+|---|---|
+| `/api/health` | 200 JSON ✅ |
+| `/actuator/health` | 200 `UP`, Railway Postgres 연결 포함 ✅ |
+| `/api/unknown` | 401 ✅ |
+| `/`, `/admin`, `/admin/employees/EMP-001` | 200 `text/html` (SPA 폴백) ✅ |
+| 실제 JS 파일 | 200 `text/javascript` ✅ |
+| `/assets/old-hash.js`, `/robots.txt` | 404 ✅ |
+
+- 응답 시간은 로컬(서울) 기준 약 0.2~0.46초였다. 응답 헤더상 Railway edge는 `hnd1`(도쿄)이다.
+- `chore/deploy-setup` 완료: 이후 main 병합마다 이 주소로 자동 배포된다.
