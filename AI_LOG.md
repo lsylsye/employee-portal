@@ -634,3 +634,34 @@
 - 사용자 근거: 같은 키로 요청이 더 들어가면 E5 동시성 결과와 호출 상한 계산에 섞일 수 있다.
 - 스키마와 인증 작업은 상관없다.
 - 적용: `feat/background-check`의 클라이언트 테스트는 목(stub) 서버로 한다. 실제 호출은 측정이 끝난 뒤에 한다. 로컬 `CLAUDE.md`에도 규칙으로 추가했다.
+
+**구현 — 인증 (`feat/auth`)**
+- 로그인은 JSON API(`POST /api/auth/login`)로 한다. 폼 로그인과 HTTP Basic은 끈다.
+  - 로그인 성공 시 세션 ID를 교체한다(세션 고정 공격 방지). CSRF 토큰도 교체한다.
+  - 세션의 PRINCIPAL_NAME은 loginId다. 비밀번호 해시는 인증 직후 지워서 세션에 남기지 않는다.
+- CSRF: SPA 방식이다. `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더로 보낸다. 로그인 요청에도 적용하고, `GET /api/auth/csrf`로 쿠키를 발급한다.
+- 로컬 Swagger는 `swagger-ui.csrf.enabled`로 쿠키 값을 헤더에 자동으로 싣는다.
+- 요청마다 차단 검사: `AccessBlockFilter`
+  - `/api/**` 요청마다 DB에서 계정과 직원을 다시 읽고 `isAccessAllowedOn(KST 오늘)`로 판단한다.
+  - 차단되면 세션을 무효화하고(spring_session 행 삭제) 401 `ACCESS_BLOCKED`를 응답한다. 계정이 없으면 거부한다(fail-closed).
+- 오류 응답: `{code, message}`. 코드는 401 `UNAUTHENTICATED`, 401 `INVALID_CREDENTIALS`, 403 `FORBIDDEN`, 403 `CSRF_INVALID` 등이다.
+
+**AI가 설계 중 보탠 것 — 로그인 차단 검사를 비밀번호 확인 뒤로 옮김** (A/B 아님, 설계 근거)
+- Spring 기본 동작은 계정 상태(`enabled`)를 비밀번호 확인 **전에** 검사한다. 그러면 차단 계정은 BCrypt 계산을 건너뛰어 응답이 빨라진다.
+- 메시지를 통일해도 응답 시간으로 퇴사 여부가 드러난다. 그래서 차단 검사를 `postAuthenticationChecks`(비밀번호 확인 뒤)로 옮겼다.
+- 없는 아이디에 대해서는 Spring이 더미 해시로 시간을 맞춘다(timing attack protection).
+
+**테스트 (T1 인증·역할, T2 KST 경계)** — `AuthAccessTest` 8건. 전체 31건 통과
+- T1:
+  - 로그인하지 않으면 401이다.
+  - 직원이 `/api/admin/**`를 호출하면 403이다.
+  - 관리자는 권한 검사를 통과한다.
+  - CSRF 토큰 없이 로그인하면 403이다.
+- 로그인 실패(틀린 비밀번호, 없는 아이디, 차단 계정)의 응답 본문이 모두 같다.
+- T2:
+  - KST 9/30 23:59:59(UTC 14:59:59)에는 로그인된다.
+  - 이미 로그인한 세션도 KST 10/1 00:00(UTC로는 아직 9/30 15:00)이 되면 다음 요청에서 401 `ACCESS_BLOCKED`가 나고, 그 세션 행이 삭제된다.
+- **AI가 처음에 잘못 작성해서 고친 테스트** (B 후보, 테스트 실패로 발견)
+  - 처음 작성: "세션 삭제"를 사용자(principal) 기준의 세션 개수로 확인했다.
+  - 문제: Spring Session은 세션 행을 테스트 트랜잭션과 별도로 커밋한다. 그래서 다른 테스트가 남긴 같은 사용자의 세션이 함께 세어졌다.
+  - 수정: 쿠키의 세션 ID로 확인한다. 테스트가 끝나면 테스트 계정의 세션을 별도 트랜잭션에서 지운다.
