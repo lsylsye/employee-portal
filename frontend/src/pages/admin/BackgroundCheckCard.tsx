@@ -1,10 +1,15 @@
-import { useEffect, useState } from 'react'
-import { api, type BgCheckDetail, type EmployeeDetail } from '../../api'
-import { BgBadge } from '../../components/status'
-import { Alert, Button, Card, InfoList, Loading } from '../../components/ui'
-import { formatKst } from '../../lib/date'
-import { useLoad } from '../../lib/useLoad'
-import { useSubmit } from '../../lib/useSubmit'
+import { ChevronDown, ChevronUp, Info, ShieldCheck } from 'lucide-react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { api, type BgCheckDetail, type BgCheckSummary, type EmployeeDetail } from '@/api'
+import { ConfirmDialog, EmptyState, InfoList, InlineError, Loading } from '@/components/common'
+import { BgBadge } from '@/components/status'
+import { Button } from '@/components/ui/button'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { formatKst } from '@/lib/date'
+import { useLoad } from '@/lib/useLoad'
+import { useSubmit } from '@/lib/useSubmit'
 
 /**
  * 화면이 우리 서버를 다시 읽는 주기. 외부 API 폴링은 백엔드가 따로 하고(Retry-After 따름),
@@ -16,7 +21,6 @@ const SCREEN_REFRESH_MS = 3000
 export function BackgroundCheckCard({ employee }: { employee: EmployeeDetail }) {
   const { employeeNo } = employee
   const { data: checks, setData, error, loading, reload } = useLoad(() => api.listBackgroundChecks(employeeNo), employeeNo)
-  const { error: runError, submitting, submit } = useSubmit()
 
   const hasPending = checks?.some((c) => c.status === 'pending') ?? false
 
@@ -27,110 +31,140 @@ export function BackgroundCheckCard({ employee }: { employee: EmployeeDetail }) 
     return () => clearInterval(timer)
   }, [hasPending, reload])
 
+  useNotifyWhenSettled(checks)
+
   // 실행할 수 없는 이유. 버튼을 막고 이유를 보여 준다
   const blockedReason =
     employee.status === 'RESIGNED'
-      ? '퇴사한 직원은 조회할 수 없습니다.'
+      ? '퇴사한 직원은 신원 조회를 할 수 없어요.'
       : !employee.birthDate
-        ? '생년월일이 확인되지 않아 조회할 수 없습니다. 위 신원 정보에서 생년월일을 입력해 주세요.'
+        ? '생년월일이 확인되지 않아 신원 조회를 할 수 없어요. 신원 정보에서 생년월일을 먼저 입력해 주세요.'
         : hasPending
-          ? '진행 중인 조회가 끝나면 다시 실행할 수 있습니다.'
+          ? '진행 중인 조회가 끝나면 다시 할 수 있어요.'
           : null
 
-  function run() {
-    if (!window.confirm(`${employee.fullName}(${employeeNo})의 신원 조회를 요청합니다. 실행 기록이 남습니다. 계속할까요?`)) return
-    void submit(async () => {
-      const created = await api.requestBackgroundCheck(employeeNo)
-      setData([created, ...(checks ?? [])])
-    })
+  async function run() {
+    const created = await api.requestBackgroundCheck(employeeNo)
+    setData([created, ...(checks ?? [])])
+    toast.info('신원 조회를 요청했어요. 결과가 나오면 알려 드릴게요.')
   }
 
   return (
-    <Card
-      title="신원 조회 (Background Check)"
-      actions={
-        <Button onClick={run} disabled={submitting || blockedReason !== null}>
-          {submitting ? '요청 중...' : '조회 실행'}
-        </Button>
-      }
-    >
-      <div className="space-y-3">
-        {blockedReason && !hasPending && <Alert tone="yellow">{blockedReason}</Alert>}
-        {runError && <Alert>{runError}</Alert>}
+    <Card>
+      <CardHeader>
+        <CardTitle>신원 조회</CardTitle>
+        <CardDescription>목록에는 판정만 보여요. 상세 결과는 열 때마다 열람 기록이 남아요.</CardDescription>
+        <CardAction>
+          <ConfirmDialog
+            trigger={
+              <Button disabled={blockedReason !== null}>
+                <ShieldCheck aria-hidden />
+                조회 요청하기
+              </Button>
+            }
+            title="신원 조회를 요청할까요?"
+            description={`${employee.fullName}(${employeeNo})님의 성명과 생년월일을 외부 조회 서비스로 보내요. 요청 기록이 남아요.`}
+            confirmLabel="요청하기"
+            onConfirm={run}
+          />
+        </CardAction>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {blockedReason && !hasPending && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Info className="size-4 shrink-0" aria-hidden />
+            {blockedReason}
+          </p>
+        )}
 
         {loading ? (
           <Loading />
         ) : error || !checks ? (
-          <Alert>{error ?? '조회 내역을 불러오지 못했습니다.'}</Alert>
+          <InlineError>{error ?? '조회 내역을 불러오지 못했어요.'}</InlineError>
         ) : checks.length === 0 ? (
-          <p className="text-sm text-gray-500">조회 내역이 없습니다.</p>
+          <EmptyState title="신원 조회 내역이 없어요" description="조회를 요청하면 여기에 결과가 쌓여요." />
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-gray-200 text-gray-500">
-              <tr>
-                <th className="py-2 pr-4 font-medium">요청 시각</th>
-                <th className="py-2 pr-4 font-medium">판정</th>
-                <th className="py-2 pr-4 font-medium">완료 시각</th>
-                <th className="py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>요청 시각</TableHead>
+                <TableHead>판정</TableHead>
+                <TableHead>완료 시각</TableHead>
+                <TableHead className="text-right">상세</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {checks.map((c) => (
-                <BgRow key={c.id} id={c.id} requestedAt={c.requestedAt} status={c.status} completedAt={c.completedAt} />
+                <BgRow key={c.id} check={c} />
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
 
-        <p className="text-xs text-gray-500">
-          목록에는 판정만 표시합니다. 상세 결과는 "결과 보기"를 누를 때만 불러오고 열람 기록이 남습니다. 신용등급은 수집하지
-          않습니다.
-        </p>
-      </div>
+        <p className="text-xs text-muted-foreground">신용등급은 수집하지 않아요.</p>
+      </CardContent>
     </Card>
   )
 }
 
-function BgRow({ id, requestedAt, status, completedAt }: Pick<BgCheckDetail, 'id' | 'requestedAt' | 'status' | 'completedAt'>) {
+/** 진행 중이던 조회가 끝나면 토스트로 알린다 */
+function useNotifyWhenSettled(checks: BgCheckSummary[] | null) {
+  const pendingIds = useRef<Set<number>>(new Set())
+
+  useEffect(() => {
+    if (!checks) return
+    for (const c of checks) {
+      if (c.status === 'pending') pendingIds.current.add(c.id)
+      else if (pendingIds.current.delete(c.id)) {
+        if (c.status === 'needs_attention') toast.error('신원 조회 결과를 받지 못했어요. 잠시 후 다시 요청해 주세요.')
+        else toast.success('신원 조회 결과가 나왔어요.')
+      }
+    }
+  }, [checks])
+}
+
+function BgRow({ check }: { check: BgCheckSummary }) {
   const [detail, setDetail] = useState<BgCheckDetail | null>(null)
   const { error, submitting, submit } = useSubmit()
-  const final = status === 'clear' || status === 'flagged'
+  const final = check.status === 'clear' || check.status === 'flagged'
+  const open = detail !== null || error !== null
 
   function toggle() {
     if (detail) return setDetail(null)
-    void submit(async () => setDetail(await api.getBackgroundCheckDetail(id)))
+    void submit(async () => setDetail(await api.getBackgroundCheckDetail(check.id)))
   }
 
   return (
-    <>
-      <tr>
-        <td className="py-2 pr-4">{formatKst(requestedAt)}</td>
-        <td className="py-2 pr-4">
-          <BgBadge status={status} />
-        </td>
-        <td className="py-2 pr-4">{formatKst(completedAt)}</td>
-        <td className="py-2 text-right">
+    <Fragment>
+      <TableRow>
+        <TableCell>{formatKst(check.requestedAt)}</TableCell>
+        <TableCell>
+          <BgBadge status={check.status} />
+        </TableCell>
+        <TableCell className="text-muted-foreground">{formatKst(check.completedAt)}</TableCell>
+        <TableCell className="text-right">
           {final && (
-            <Button variant="secondary" onClick={toggle} disabled={submitting}>
-              {detail ? '닫기' : '결과 보기'}
+            <Button variant="ghost" size="sm" onClick={toggle} disabled={submitting} aria-expanded={detail !== null}>
+              {detail ? '접기' : '결과 보기'}
+              {detail ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />}
             </Button>
           )}
-        </td>
-      </tr>
-      {status === 'needs_attention' && (
-        <tr>
-          <td colSpan={4} className="pb-3 text-xs text-yellow-800">
-            외부 서비스에서 결과를 받지 못해 추적을 멈췄습니다. 잠시 후 다시 실행해 주세요.
-          </td>
-        </tr>
+        </TableCell>
+      </TableRow>
+      {check.status === 'needs_attention' && (
+        <TableRow className="hover:bg-transparent">
+          <TableCell colSpan={4} className="whitespace-normal">
+            <InlineError>외부 서비스에서 결과를 받지 못해 추적을 멈췄어요. 잠시 후 다시 요청해 주세요.</InlineError>
+          </TableCell>
+        </TableRow>
       )}
-      {(detail || error) && (
-        <tr>
-          <td colSpan={4} className="pb-3">
+      {open && (
+        <TableRow className="hover:bg-transparent">
+          <TableCell colSpan={4} className="whitespace-normal">
             {error ? (
-              <Alert>{error}</Alert>
+              <InlineError>{error}</InlineError>
             ) : (
-              <div className="rounded-md bg-gray-50 p-3">
+              <div className="rounded-md bg-muted/60 p-4">
                 <InfoList
                   items={[
                     ['범죄 기록', yesNo(detail!.criminalRecord, '있음', '없음')],
@@ -140,10 +174,10 @@ function BgRow({ id, requestedAt, status, completedAt }: Pick<BgCheckDetail, 'id
                 />
               </div>
             )}
-          </td>
-        </tr>
+          </TableCell>
+        </TableRow>
       )}
-    </>
+    </Fragment>
   )
 }
 

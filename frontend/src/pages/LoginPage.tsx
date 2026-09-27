@@ -1,9 +1,12 @@
+import { Loader2 } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
-import { useAuth } from '../auth/AuthContext'
-import { homeOf } from '../components/Layout'
-import { Alert, Button, Field } from '../components/ui'
-import { errorMessage } from '../lib/useLoad'
+import { useAuth } from '@/auth/AuthContext'
+import { Field, InlineError } from '@/components/common'
+import { homeOf } from '@/components/Layout'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { errorMessage } from '@/lib/useLoad'
 
 export function LoginPage() {
   const { user, login } = useAuth()
@@ -35,30 +38,38 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h1 className="text-lg font-semibold text-gray-900">사내 직원 관리 시스템</h1>
-        <Field
-          label="아이디"
-          hint="직원은 사번(예: EMP-001)"
-          autoComplete="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
-        <Field
-          label="비밀번호"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        {error && <Alert>{error}</Alert>}
-        <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? '로그인 중...' : '로그인'}
-        </Button>
-      </form>
+    <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <CardTitle>사내 직원 관리</CardTitle>
+          <CardDescription>사번이나 관리자 아이디로 로그인해 주세요.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="grid gap-4">
+            <Field
+              label="아이디"
+              placeholder="EMP-001"
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+            />
+            <Field
+              label="비밀번호"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            {error && <InlineError>{error}</InlineError>}
+            <Button type="submit" size="lg" className="w-full" disabled={submitting}>
+              {submitting && <Loader2 className="animate-spin" aria-hidden />}
+              로그인하기
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

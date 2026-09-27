@@ -1,5 +1,6 @@
 import { BrowserRouter, Link, Route, Routes } from 'react-router'
 import { AuthProvider } from './auth/AuthContext'
+import { Toaster } from './components/ui/sonner'
 import { RequireRole, RootRedirect } from './components/Layout'
 import { LoginPage } from './pages/LoginPage'
 import { EmployeeCreatePage } from './pages/admin/EmployeeCreatePage'
@@ -36,6 +37,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
+      <Toaster theme="light" position="top-right" />
     </AuthProvider>
   )
 }

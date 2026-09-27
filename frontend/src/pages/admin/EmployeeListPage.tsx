@@ -1,80 +1,88 @@
+import { Plus, Search } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router'
-import { api } from '../../api'
-import { BgBadge, EmploymentBadge } from '../../components/status'
-import { Alert, Card, Loading } from '../../components/ui'
-import { useLoad } from '../../lib/useLoad'
+import { Link, useNavigate } from 'react-router'
+import { api } from '@/api'
+import { EmptyState, InlineError, Loading, PageHeader } from '@/components/common'
+import { BgBadge, EmploymentBadge } from '@/components/status'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useLoad } from '@/lib/useLoad'
 
 export function EmployeeListPage() {
+  const navigate = useNavigate()
   const { data: employees, error, loading } = useLoad(() => api.listEmployees())
   const [query, setQuery] = useState('')
 
-  if (loading) return <Loading />
-  if (error || !employees) return <Alert>{error ?? '목록을 불러오지 못했습니다.'}</Alert>
-
   const q = query.trim()
-  const rows = q ? employees.filter((e) => e.fullName.includes(q) || e.employeeNo.includes(q.toUpperCase())) : employees
+  const rows = employees && q ? employees.filter((e) => e.fullName.includes(q) || e.employeeNo.includes(q.toUpperCase())) : employees
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">직원 목록</h1>
-        <Link to="/admin/employees/new" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
-          계정 생성
-        </Link>
-      </div>
-
+    <>
+      <PageHeader
+        title="직원 목록"
+        description={employees ? `전체 ${employees.length}명` : undefined}
+        actions={
+          <Button asChild>
+            <Link to="/admin/employees/new">
+              <Plus aria-hidden />
+              계정 만들기
+            </Link>
+          </Button>
+        }
+      />
       <Card>
-        <input
-          className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm sm:w-72"
-          placeholder="성명 또는 사번 검색"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {/* 동명이인(EMP-001, 002)을 구분하도록 사번·생년월일을 항상 함께 보여 준다(F-i) */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-gray-200 text-gray-500">
-              <tr>
-                <th className="py-2 pr-4 font-medium">사번</th>
-                <th className="py-2 pr-4 font-medium">성명</th>
-                <th className="py-2 pr-4 font-medium">생년월일</th>
-                <th className="py-2 pr-4 font-medium">상태</th>
-                <th className="py-2 pr-4 font-medium">접근 차단일</th>
-                <th className="py-2 font-medium">최근 신원 조회</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rows.map((e) => (
-                <tr key={e.employeeNo} className="hover:bg-gray-50">
-                  <td className="py-2 pr-4">
-                    <Link to={`/admin/employees/${e.employeeNo}`} className="font-mono text-blue-600 hover:underline">
-                      {e.employeeNo}
-                    </Link>
-                  </td>
-                  <td className="py-2 pr-4">{e.fullName}</td>
-                  <td className="py-2 pr-4">{e.birthDate ?? <span className="text-yellow-700">확인되지 않음</span>}</td>
-                  <td className="py-2 pr-4">
-                    <EmploymentBadge status={e.status} />
-                  </td>
-                  <td className="py-2 pr-4">{e.accessBlockedFrom ?? '-'}</td>
-                  <td className="py-2">
-                    <BgBadge status={e.latestBgStatus} />
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="py-6 text-center text-gray-500">
-                    검색 결과가 없습니다.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-3 text-xs text-gray-500">총 {employees.length}명</p>
+        <CardContent className="grid gap-4">
+          <div className="relative w-full sm:w-72">
+            <Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input className="pl-8" placeholder="성명이나 사번으로 찾기" aria-label="직원 검색" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </div>
+
+          {loading ? (
+            <Loading />
+          ) : error || !rows ? (
+            <InlineError>{error ?? '목록을 불러오지 못했어요.'}</InlineError>
+          ) : rows.length === 0 ? (
+            <EmptyState title={q ? `'${q}'에 맞는 직원이 없어요` : '등록된 직원이 없어요'} description={q ? '성명이나 사번을 다시 확인해 주세요.' : undefined} />
+          ) : (
+            // 동명이인(EMP-001, 002)을 구분하도록 사번·생년월일을 항상 함께 보여 준다(F-i)
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>사번</TableHead>
+                  <TableHead>성명</TableHead>
+                  <TableHead>생년월일</TableHead>
+                  <TableHead>재직 상태</TableHead>
+                  <TableHead>접근 차단일</TableHead>
+                  <TableHead>최근 신원 조회</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((e) => (
+                  <TableRow key={e.employeeNo} className="cursor-pointer" onClick={() => navigate(`/admin/employees/${e.employeeNo}`)}>
+                    <TableCell>
+                      {/* 키보드 사용자는 링크로 이동한다. 행 클릭은 마우스 편의 */}
+                      <Link to={`/admin/employees/${e.employeeNo}`} className="font-mono text-primary hover:underline" onClick={(ev) => ev.stopPropagation()}>
+                        {e.employeeNo}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="font-medium">{e.fullName}</TableCell>
+                    <TableCell>{e.birthDate ?? <span className="text-status-warning">확인 필요</span>}</TableCell>
+                    <TableCell>
+                      <EmploymentBadge status={e.status} />
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{e.accessBlockedFrom ?? '-'}</TableCell>
+                    <TableCell>
+                      <BgBadge status={e.latestBgStatus} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
       </Card>
-    </div>
+    </>
   )
 }

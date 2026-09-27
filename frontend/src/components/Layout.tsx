@@ -1,10 +1,21 @@
-import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router'
-import type { Role } from '../api'
-import { useAuth } from '../auth/AuthContext'
-import { Button, Loading } from './ui'
+import { LogOut, UserRound, Users, type LucideIcon } from 'lucide-react'
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import type { Role } from '@/api'
+import { useAuth } from '@/auth/AuthContext'
+import { Loading } from '@/components/common'
+import { Button } from '@/components/ui/button'
+
+type MenuItem = { to: string; label: string; icon: LucideIcon }
+
+// 역할별 메뉴. 직원은 내 정보 하나, 관리자는 직원 목록 하나
+const MENUS: Record<Role, MenuItem[]> = {
+  EMPLOYEE: [{ to: '/me', label: '내 정보', icon: UserRound }],
+  ADMIN: [{ to: '/admin', label: '직원 목록', icon: Users }],
+}
 
 /**
- * 로그인과 역할을 확인하는 화면 틀. 화면 가드는 편의일 뿐이고, 실제 접근 통제는 서버가 한다(F7).
+ * 로그인과 역할을 확인하고 앱 셸(사이드바 + 본문)을 그린다.
+ * 화면 가드는 편의일 뿐이고, 실제 접근 통제는 서버가 한다(F7).
  */
 export function RequireRole({ role }: { role: Role }) {
   const { user } = useAuth()
@@ -18,19 +29,21 @@ export function RequireRole({ role }: { role: Role }) {
     )
   }
   if (user === null) return <Navigate to="/login" replace state={{ from: location.pathname }} />
-  if (user.role !== role) return <Navigate to={homeOf(role === 'ADMIN' ? 'EMPLOYEE' : 'ADMIN')} replace />
+  if (user.role !== role) return <Navigate to={homeOf(user.role)} replace />
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <main className="mx-auto max-w-5xl px-4 py-6">
-        <Outlet />
+    <div className="flex min-h-screen bg-muted/40">
+      <Sidebar />
+      <main className="min-w-0 flex-1">
+        <div className="mx-auto max-w-5xl px-8 py-8">
+          <Outlet />
+        </div>
       </main>
     </div>
   )
 }
 
-function Header() {
+function Sidebar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -40,34 +53,35 @@ function Header() {
   }
 
   return (
-    <header className="border-b border-gray-200 bg-white">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-6">
-          <Link to={homeOf(user!.role)} className="font-semibold text-gray-900">
-            사내 직원 관리 시스템
-          </Link>
-          {user!.role === 'ADMIN' && (
-            <nav className="flex gap-4 text-sm text-gray-600">
-              <Link to="/admin" className="hover:text-gray-900">
-                직원 목록
-              </Link>
-              <Link to="/admin/employees/new" className="hover:text-gray-900">
-                계정 생성
-              </Link>
-            </nav>
-          )}
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-gray-600">
-            {user!.displayName}
-            {user!.employeeNo && <span className="ml-1 text-gray-400">({user!.employeeNo})</span>}
-          </span>
-          <Button variant="secondary" onClick={onLogout}>
-            로그아웃
-          </Button>
-        </div>
+    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r bg-sidebar px-4 py-6">
+      <p className="px-2 text-sm font-semibold">사내 직원 관리</p>
+      <nav className="mt-6 grid gap-1">
+        {MENUS[user!.role].map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            // 관리자 직원 목록은 상세·생성 화면에서도 선택된 상태로 둔다
+            end={false}
+            className={({ isActive }) =>
+              `flex items-center gap-2 rounded-md px-2 py-2 text-sm ${
+                isActive ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60'
+              }`
+            }
+          >
+            <Icon className="size-4" aria-hidden />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
+      <div className="mt-auto border-t pt-4">
+        <p className="px-2 text-sm font-medium">{user!.displayName}</p>
+        <p className="px-2 text-xs text-muted-foreground">{user!.role === 'ADMIN' ? '관리자' : user!.employeeNo}</p>
+        <Button variant="ghost" className="mt-2 w-full justify-start" onClick={onLogout}>
+          <LogOut aria-hidden />
+          로그아웃하기
+        </Button>
       </div>
-    </header>
+    </aside>
   )
 }
 
