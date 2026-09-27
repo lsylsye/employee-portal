@@ -12,7 +12,10 @@ export const RAW_DIR = fileURLToPath(new URL('../raw/', import.meta.url))
 export const GLOBAL_CAP = 5000
 export const EXP_CAPS = { e0: 30, e1: 1500, e2: 1100, e3: 40, e4: 60, e5: 1100, e6: 200, e7: 750 }
 
-const REQUEST_TIMEOUT_MS = 30_000 // 측정용으로 넉넉하게. 긴 꼬리 지연까지 관측하기 위함.
+// 측정용으로 넉넉하게: 긴 꼬리 지연까지 관측하기 위함.
+// E0 에서 30초 타임아웃 2건, 404 응답도 8~30초가 관측되어 30s → 60s 로 늘렸다(30s 는 꼬리를 잘라버림).
+// (E7 run1 은 30s 로 시작해 그대로 둠 — 분석 시 30s 에서 잘린 값으로 취급)
+const REQUEST_TIMEOUT_MS = Number(process.env.TIMEOUT_MS ?? 60_000)
 const PROBE_DELAYS_SEC = [0, 1, 5] // + Retry-After(없으면 30초)
 const OTHERS_REFRESH_MS = 2_000
 
