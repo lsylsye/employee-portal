@@ -182,6 +182,86 @@ h('6. POST 응답 상태 (201 중 즉시 완료 비율)')
   out.push(`\nestimatedCompletionSeconds 가 있는 201: ${est.length}/${p201.length}, 값: ${[...new Set(est.map((r) => r.estimatedCompletionSeconds))].join(', ') || '-'}`)
 }
 
+// ---------- 7. E1 pending → 최종 소요 시간 ----------
+h('7. pending → 최종 상태 소요 시간 (E1)')
+{
+  let tracks = []
+  try {
+    tracks = JSON.parse(readFileSync(fileURLToPath(new URL(`./results/${runId}-e1-tracks.json`, import.meta.url)), 'utf8'))
+  } catch {}
+  const pend = tracks.filter((t) => t.postBodyStatus === 'pending')
+  const srv = pend.filter((t) => t.serverCompletedAt).map((t) => new Date(t.serverCompletedAt) - new Date(t.serverCreatedAt)).sort((a, b) => a - b)
+  const obs = pend.filter((t) => t.finalObservedMs).map((t) => t.finalObservedMs).sort((a, b) => a - b)
+  const immediate = tracks.filter((t) => String(t.outcome).endsWith('-immediate')).length
+  const created = tracks.filter((t) => t.postStatus === 201).length
+  out.push(`- POST 201 중 즉시 최종: ${ci(immediate, created)} (n=${created}), pending 중 미완료: ${pend.filter((t) => String(t.outcome).startsWith('unfinished')).length}/${pend.length}\n`)
+  out.push(
+    table(
+      ['기준', 'n', '최소', 'p50', 'p90', 'p95', '최댓값'],
+      [
+        ['서버 completedAt − createdAt', srv.length, ms(srv[0] ?? null), ms(percentile(srv, 50)), ms(percentile(srv, 90)), ms(percentile(srv, 95)), ms(srv.at(-1) ?? null)],
+        ['폴링 관측 (POST 응답 → 최종 GET 수신, 1초 간격)', obs.length, ms(obs[0] ?? null), ms(percentile(obs, 50)), ms(percentile(obs, 90)), ms(percentile(obs, 95)), ms(obs.at(-1) ?? null)],
+      ],
+    ),
+  )
+  const polls = pend.reduce((s, t) => s + t.polls, 0)
+  const pollErr = pend.reduce((s, t) => s + t.pollErrors, 0)
+  out.push(`\n폴링 GET 실패: ${ci(pollErr, polls)} (n=${polls})`)
+}
+
+// ---------- 8. E3 같은 employeeId POST 반복 ----------
+h('8. 같은 employeeId 로 POST 반복 (E3)')
+{
+  const p3 = recs.filter((r) => r.exp === 'e3' && r.method === 'POST')
+  const rows = []
+  for (const g of ['a', 'b', 'c']) {
+    const ps = p3.filter((r) => r.group === g)
+    if (!ps.length) continue
+    const ok = ps.filter((r) => r.httpStatus === 201)
+    const label = { a: '같은 내용 순차 반복', b: '같은 id, 다른 이름·생년월일', c: '같은 내용 동시' }[g]
+    rows.push([`${g}: ${label}`, ps.length, ok.length, new Set(ok.map((r) => r.checkId)).size, ok.map((r) => r.bodyStatus).join(',')])
+  }
+  out.push(table(['그룹', 'POST n', '201', '서로 다른 checkId', 'POST 응답 status 순서'], rows))
+  const lists = recs.filter((r) => r.exp === 'e3' && r.phase === 'list')
+  out.push(`\n목록 확인: ${lists.filter((r) => r.httpStatus === 200).map((r) => `${r.group} totalCount=${r.totalCount}`).join(', ') || '없음'} (목록 GET n=${lists.length}, 200 ${lists.filter((r) => r.httpStatus === 200).length})`)
+}
+
+// ---------- 9. E5 동시성 단계별 ----------
+h('9. 동시 요청 수에 따른 변화 (E5)')
+{
+  const e5 = recs.filter((r) => r.exp === 'e5')
+  const rows = []
+  for (const kind of ['GET', 'POST'])
+    for (const c of [...new Set(e5.filter((r) => r.kind === kind).map((r) => r.concurrency))].sort((a, b) => a - b)) {
+      const rs = e5.filter((r) => r.kind === kind && r.concurrency === c)
+      const ok = rs.filter((r) => r.httpStatus && r.httpStatus < 500).map((r) => r.latencyMs).sort((a, b) => a - b)
+      const n5 = rs.filter((r) => r.httpStatus >= 500).length
+      const n503 = rs.filter((r) => r.httpStatus === 503).length
+      rows.push([kind, c, rs.length, ci(ok.length, rs.length), ci(n503, rs.length), n5, ms(percentile(ok, 50)), ms(percentile(ok, 95)), ms(ok.at(-1) ?? null), rs.filter((r) => r.errorClass === 'timeout').length])
+    }
+  out.push(table(['요청', '동시', 'n', '성공률 [95% CI]', '503 비율 [95% CI]', '5xx n', '성공 p50', '성공 p95', '성공 최댓값', 'timeout'], rows))
+}
+
+// ---------- 10. E7 시간대별 ----------
+h('10. 시간 경과에 따른 변화 (E7, 30분 구간)')
+{
+  const e7 = recs.filter((r) => r.exp === 'e7' && r.method === 'GET')
+  if (e7.length) {
+    const t0 = new Date(e7[0].ts)
+    const buckets = {}
+    for (const r of e7) (buckets[Math.floor((new Date(r.ts) - t0) / 1_800_000)] ??= []).push(r)
+    out.push(
+      table(
+        ['구간(분)', 'n', '성공률 [95% CI]', '성공 p50', '성공 p95', 'timeout(30s 구간)'],
+        Object.entries(buckets).map(([b, rs]) => {
+          const ok = rs.filter((r) => r.httpStatus === 200).map((r) => r.latencyMs).sort((a, x) => a - x)
+          return [`${b * 30}–${b * 30 + 30}`, rs.length, ci(ok.length, rs.length), ms(percentile(ok, 50)), ms(percentile(ok, 95)), rs.filter((r) => r.errorClass === 'timeout').length]
+        }),
+      ),
+    )
+  }
+}
+
 const text = out.join('\n')
 console.log(text)
 const dir = fileURLToPath(new URL('./results/', import.meta.url))
