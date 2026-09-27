@@ -64,6 +64,8 @@ const MESSAGES: Record<string, string> = {
   UNAUTHENTICATED: '로그인이 필요해요.',
   ACCESS_BLOCKED: '접근이 차단된 계정이에요.',
   FORBIDDEN: '권한이 없어요.',
+  EMPLOYEE_NOT_FOUND: '직원을 찾을 수 없어요.',
+  BIRTH_DATE_IN_FUTURE: '생년월일은 오늘 이후일 수 없어요.',
   CSRF_INVALID: '보안 토큰이 만료됐어요. 페이지를 새로고침해 주세요.',
 }
 

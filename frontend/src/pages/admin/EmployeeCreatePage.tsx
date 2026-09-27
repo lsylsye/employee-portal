@@ -37,7 +37,7 @@ export function EmployeeCreatePage() {
         <ArrowLeft className="size-4" aria-hidden />
         직원 목록
       </Link>
-      <PageHeader title="계정 만들기" description="사번은 자동으로 발급되고, 아이디는 사번이에요." />
+      <PageHeader title="계정 만들기" description="사번은 자동으로 발급되고, 아이디는 사번이에요. 성과 이름은 공백 없이 따로 입력해 주세요." />
 
       {created ? (
         <Card>
@@ -74,8 +74,8 @@ export function EmployeeCreatePage() {
             <form onSubmit={onSubmit} className="grid gap-4">
               {/* 성·이름을 따로 받는다. 복성(남궁, 황보, 선우)을 문자열 규칙으로 자를 수 없어서다 */}
               <div className="grid grid-cols-2 gap-4">
-                <Field label="성" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="남궁" required />
-                <Field label="이름" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="서준" required />
+                <Field label="성" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="남궁" pattern="\S+" title="공백 없이 입력해 주세요." required />
+                <Field label="이름" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="서준" pattern="\S+" title="공백 없이 입력해 주세요." required />
               </div>
               <Field
                 label="생년월일"

@@ -131,10 +131,10 @@ function IdentityForm({ employee, onCancel, onSaved }: { employee: EmployeeDetai
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
       <div className="grid grid-cols-2 gap-4">
-        <Field label="성 (lastName)" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
-        <Field label="이름 (firstName)" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+        <Field label="성 (lastName)" value={lastName} onChange={(e) => setLastName(e.target.value)} pattern="\S+" title="공백 없이 입력해 주세요." required />
+        <Field label="이름 (firstName)" value={firstName} onChange={(e) => setFirstName(e.target.value)} pattern="\S+" title="공백 없이 입력해 주세요." required />
       </div>
-      <Field label="생년월일" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+      <Field label="생년월일" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} max={todayKst()} hint="한 번 입력한 생년월일은 비울 수 없고, 다른 날짜로만 바꿀 수 있어요." />
       {error && <InlineError>{error}</InlineError>}
       <div className="flex gap-2">
         <Button type="submit" disabled={submitting}>

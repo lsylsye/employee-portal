@@ -213,10 +213,12 @@ function findEmployee(employeeNo: string): MockEmployee {
 }
 
 function requireName(lastName: string, firstName: string) {
-  if (!lastName.trim() || !firstName.trim()) fail(400, 'INVALID_REQUEST', '성과 이름을 모두 입력해 주세요.')
+  // 서버: 공백 없이 1자 이상 (성명 = 성 + 이름)
+  if (!/^\S+$/.test(lastName) || !/^\S+$/.test(firstName)) fail(400, 'INVALID_REQUEST')
 }
 
-const trimOrNull = (v: string | null) => (v?.trim() ? v.trim() : null)
+// 서버와 같게: null 은 바꾸지 않음, 문자열(빈 문자열 포함)은 그 값으로 저장
+const keepOrSet = (next: string | null | undefined, prev: string | null) => (next == null ? prev : next.trim())
 
 export const mockApi: Api = {
   login: ({ loginId, password }) =>
@@ -242,10 +244,10 @@ export const mockApi: Api = {
       const e = findEmployee(requireRole('EMPLOYEE').employeeNo!)
       // 허용 필드만 반영한다(전용 DTO, 판단 4)
       Object.assign(e, {
-        phone: trimOrNull(req.phone),
-        email: trimOrNull(req.email),
-        address: trimOrNull(req.address),
-        emergencyContact: trimOrNull(req.emergencyContact),
+        phone: keepOrSet(req.phone, e.phone),
+        email: keepOrSet(req.email, e.email),
+        address: keepOrSet(req.address, e.address),
+        emergencyContact: keepOrSet(req.emergencyContact, e.emergencyContact),
       })
       return toProfile(e)
     }),

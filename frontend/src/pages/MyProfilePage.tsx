@@ -1,7 +1,7 @@
 import { Loader2, Pencil } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { toast } from 'sonner'
-import { api, type ContactFields, type MyProfile } from '@/api'
+import { api, type ContactFields, type MyProfile, type UpdateMyProfileRequest } from '@/api'
 import { EmptyState, Field, InfoList, InlineError, Loading, PageHeader } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -121,7 +121,7 @@ function ContactCard({ profile, onSaved }: { profile: MyProfile; onSaved: (p: My
 }
 
 function ContactForm({ profile, onCancel, onSaved }: { profile: MyProfile; onCancel: () => void; onSaved: (p: MyProfile) => void }) {
-  // 입력창은 빈 문자열로 다루고, 보낼 때 빈 값은 null 로 바꾼다
+  // 입력창은 빈 문자열로 다룬다(서버 null → '')
   const [form, setForm] = useState<Record<keyof ContactFields, string>>({
     phone: profile.phone ?? '',
     email: profile.email ?? '',
@@ -134,11 +134,12 @@ function ContactForm({ profile, onCancel, onSaved }: { profile: MyProfile; onCan
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
-    const req: ContactFields = {
-      phone: form.phone.trim() || null,
-      email: form.email.trim() || null,
-      address: form.address.trim() || null,
-      emergencyContact: form.emergencyContact.trim() || null,
+    // 빈칸은 빈 문자열로 보내야 지워진다(null 은 "바꾸지 않음")
+    const req: UpdateMyProfileRequest = {
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      address: form.address.trim(),
+      emergencyContact: form.emergencyContact.trim(),
     }
     void submit(async () => onSaved(await api.updateMyProfile(req)))
   }
