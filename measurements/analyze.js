@@ -33,7 +33,7 @@ function wilson(k, n, z = 1.96) {
   const d = 1 + (z * z) / n
   const c = p + (z * z) / (2 * n)
   const m = z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))
-  return [(c - m) / d, (c + m) / d]
+  return [Math.max(0, (c - m) / d), Math.min(1, (c + m) / d)]
 }
 const pct = (x) => (x === null ? '-' : `${(x * 100).toFixed(1)}%`)
 const ci = (k, n) => {
@@ -142,7 +142,7 @@ out.push('\n연속 실패 N회 확률 (독립 가정, 계산값):\n')
   out.push(
     table(
       ['N', '섞인 실패율 기준', '일시적 실패율 기준'],
-      [1, 2, 3, 5, 8].map((N) => [N, pct(pFailAll === null ? null : pFailAll ** N), pct(pFailT === null ? null : pFailT ** N)]),
+      [1, 2, 3, 5, 8, 10].map((N) => [N, pct(pFailAll === null ? null : pFailAll ** N), pct(pFailT === null ? null : pFailT ** N)]),
     ),
   )
   out.push(`\n(섞인 실패율 ${pct(pFailAll)}, 일시적 실패율 ${pct(pFailT)} — 지속 실패 checkId 에는 횟수를 늘려도 효과가 없다)`)
@@ -180,6 +180,57 @@ h('6. POST 응답 상태 (201 중 즉시 완료 비율)')
   out.push(table(['POST 응답 status', '건수', '비율 [95% CI]'], Object.entries(by).map(([k, v]) => [k, v, ci(v, p201.length)])))
   const est = p201.filter((r) => r.estimatedCompletionSeconds !== undefined)
   out.push(`\nestimatedCompletionSeconds 가 있는 201: ${est.length}/${p201.length}, 값: ${[...new Set(est.map((r) => r.estimatedCompletionSeconds))].join(', ') || '-'}`)
+}
+
+// ---------- 6b. 성공 지연의 모양 + 시간 예산 시뮬레이션 ----------
+h('6b. GET 상세 — 성공 지연의 모양과 서버 상한 (60s 구간)')
+const g60 = recs.filter((r) => endpoint(r) === 'GET 상세' && r.timeoutMs === 60_000)
+{
+  const ok = g60.filter(isOk).map((r) => r.latencyMs).sort((a, b) => a - b)
+  const any = g60.filter((r) => r.latencyMs !== undefined).map((r) => r.latencyMs).sort((a, b) => a - b)
+  out.push(`- 60s 구간 GET 상세 n=${g60.length}. 응답 최댓값(상태 무관) ${ms(any.at(-1) ?? null)}, 30.5초 초과 응답 ${any.filter((x) => x > 30_500).length}건, timeout ${g60.filter((r) => r.errorClass === 'timeout').length}건`)
+  out.push(`- 30초 넘게 걸린 응답의 상태: ${JSON.stringify(g60.filter((r) => r.latencyMs > 30_000).reduce((m, r) => ((m[r.outcome] = (m[r.outcome] ?? 0) + 1), m), {}))}\n`)
+  out.push(table(['성공 응답 지연 ≤', ...[0.5, 1, 2, 3, 5, 10, 20, 30].map((t) => `${t}s`)], [
+    ['누적 비율 (성공 n=' + ok.length + ')', ...[0.5, 1, 2, 3, 5, 10, 20, 30].map((t) => pct(ok.filter((x) => x <= t * 1000).length / ok.length))],
+    ['시도당 T초 안에 성공할 확률 (전체 n=' + g60.length + ')', ...[0.5, 1, 2, 3, 5, 10, 20, 30].map((t) => pct(ok.filter((x) => x <= t * 1000).length / g60.length))],
+  ]))
+}
+
+h('6c. 동기 조회 시간 예산 시뮬레이션 (60s 구간 원자료 재표집)')
+out.push('- 근거: §3 "실패 직후 다음 시도 성공률" 이 전체 성공률과 같고 §4 대기 시간별 성공률 차이가 없어, 시도를 독립으로 보고 원자료에서 무작위로 뽑아 재현한다.')
+out.push('- 한 시도: 무작위 원자료 1건. 지연 ≤ 시도 타임아웃 이고 성공이면 성공. 아니면 min(지연, 타임아웃) 만큼 시간을 쓰고 다음 시도. 예산을 넘으면 포기. 20,000회 반복, 시드 고정.\n')
+{
+  let seed = 42
+  const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
+  const pool = g60.map((r) => ({ lat: r.errorClass === 'timeout' ? r.timeoutMs : r.latencyMs, ok: isOk(r) }))
+  const sim = (T, B, trials = 20_000) => {
+    let succ = 0
+    const waits = []
+    let tries = 0
+    for (let k = 0; k < trials; k++) {
+      let t = 0
+      let n = 0
+      for (;;) {
+        const a = pool[Math.floor(rand() * pool.length)]
+        const cap = Math.min(T, B - t)
+        n++
+        if (a.ok && a.lat <= cap) { t += a.lat; succ++; waits.push(t); break }
+        t += Math.min(a.lat, cap)
+        if (t >= B - 1) { waits.push(B); break }
+      }
+      tries += n
+    }
+    waits.sort((a, b) => a - b)
+    return { p: succ / trials, p95: percentile(waits, 95), tries: tries / trials }
+  }
+  const rows = []
+  for (const B of [5_000, 10_000, 15_000, 30_000])
+    for (const T of [2_000, 3_000, 5_000, 30_500]) {
+      if (T > B && T !== 30_500) continue
+      const r = sim(T, B)
+      rows.push([`${B / 1000}s`, T === 30_500 ? '30.5s(상한 대기)' : `${T / 1000}s`, pct(r.p), ms(r.p95), r.tries.toFixed(1)])
+    }
+  out.push(table(['전체 예산', '시도당 타임아웃', '예산 안 성공 확률', '사용자 대기 p95', '평균 시도 수'], rows))
 }
 
 // ---------- 7. E1 pending → 최종 소요 시간 ----------
