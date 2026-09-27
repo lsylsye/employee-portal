@@ -1,0 +1,13 @@
+# 빌드 컨텍스트에서 제외 (용량·캐시 무효화·비밀값 유출 방지)
+**/node_modules
+**/dist
+backend/build
+backend/.gradle
+backend/src/main/resources/static
+**/.env
+**/.env.*
+.git
+.idea
+*.zip
+CLAUDE.md
+AI_LOG.md
