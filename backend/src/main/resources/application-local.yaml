@@ -10,3 +10,6 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+    # XSRF-TOKEN 쿠키를 읽어 X-XSRF-TOKEN 헤더로 보낸다. 먼저 GET /api/auth/csrf 를 실행한다.
+    csrf:
+      enabled: true
