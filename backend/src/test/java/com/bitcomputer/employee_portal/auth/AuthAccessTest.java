@@ -1,6 +1,7 @@
 package com.bitcomputer.employee_portal.auth;
 
 import com.bitcomputer.employee_portal.config.ClockConfig;
+import com.bitcomputer.employee_portal.support.MutableClock;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,9 +116,8 @@ class AuthAccessTest {
     void 관리자는_관리자_API_권한_검사를_통과한다() throws Exception {
         Cookie session = login(ADMIN_ID, PASSWORD);
 
-        // 아직 핸들러가 없어서 404. 403 이 아니면 권한 검사는 통과한 것이다.
         mockMvc.perform(get("/api/admin/employees").cookie(session))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk());
     }
 
     @Test
