@@ -97,11 +97,15 @@ function load(): MockDb {
   return seed()
 }
 
-const db = load()
+// 모듈 최상단에서 불러오면 부수효과가 생겨 배포 번들에서 목 코드가 제거되지 않는다. 처음 쓸 때 불러온다
+let cached: MockDb | undefined
+function data(): MockDb {
+  return (cached ??= load())
+}
 
 function save() {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(db))
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data()))
   } catch {
     // 목이므로 저장 실패는 무시한다
   }
@@ -137,7 +141,7 @@ function settle(c: MockBg) {
 }
 
 function checksOf(employeeNo: string): MockBg[] {
-  return db.checks
+  return data().checks
     .filter((c) => c.employeeNo === employeeNo)
     .map((c) => (settle(c), c))
     .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
@@ -186,14 +190,14 @@ function toBgSummary(c: MockBg): BgCheckSummary {
 }
 
 function sessionUser(): SessionUser | null {
-  if (!db.session) return null
-  if (db.session === ADMIN.username) {
+  if (!data().session) return null
+  if (data().session === ADMIN.username) {
     return { username: ADMIN.username, role: 'ADMIN', employeeNo: null, displayName: ADMIN.displayName }
   }
-  const e = db.employees.find((x) => x.employeeNo === db.session)
+  const e = data().employees.find((x) => x.employeeNo === data().session)
   // 퇴사(차단일 도래)면 기존 세션도 다음 요청에서 끊긴다
   if (!e || statusOf(e) === 'RESIGNED') {
-    db.session = null
+    data().session = null
     return null
   }
   return { username: e.employeeNo, role: 'EMPLOYEE', employeeNo: e.employeeNo, displayName: e.lastName + e.firstName }
@@ -207,7 +211,7 @@ function requireRole(role: 'ADMIN' | 'EMPLOYEE'): SessionUser {
 }
 
 function findEmployee(employeeNo: string): MockEmployee {
-  const e = db.employees.find((x) => x.employeeNo === employeeNo)
+  const e = data().employees.find((x) => x.employeeNo === employeeNo)
   if (!e) throw new ApiError(404, '직원을 찾을 수 없습니다.')
   return e
 }
@@ -223,17 +227,17 @@ export const mockApi: Api = {
   login: ({ username, password }) =>
     delay(() => {
       if (username === ADMIN.username && password === ADMIN.password) {
-        db.session = ADMIN.username
+        data().session = ADMIN.username
         return sessionUser()!
       }
-      const e = db.employees.find((x) => x.employeeNo === username)
+      const e = data().employees.find((x) => x.employeeNo === username)
       if (!e || e.password !== password || statusOf(e) === 'RESIGNED') throw new ApiError(401, LOGIN_FAILED)
-      db.session = e.employeeNo
+      data().session = e.employeeNo
       return sessionUser()!
     }),
   logout: () =>
     delay(() => {
-      db.session = null
+      data().session = null
     }),
   currentUser: () => delay(() => sessionUser(), 50),
 
@@ -248,7 +252,7 @@ export const mockApi: Api = {
   listEmployees: () =>
     delay(() => {
       requireRole('ADMIN')
-      return db.employees.map(toSummary)
+      return data().employees.map(toSummary)
     }),
   getEmployee: (no) =>
     delay(() => {
@@ -259,7 +263,7 @@ export const mockApi: Api = {
     delay(() => {
       requireRole('ADMIN')
       requireName(req.lastName, req.firstName)
-      const next = db.employees.length + 1
+      const next = data().employees.length + 1
       const employeeNo = `EMP-${String(next).padStart(3, '0')}`
       const initialPassword = Math.random().toString(36).slice(2, 10)
       const e: MockEmployee = {
@@ -273,7 +277,7 @@ export const mockApi: Api = {
         password: initialPassword,
         accessBlockedFrom: null,
       }
-      db.employees.push(e)
+      data().employees.push(e)
       return { employee: toDetail(e), username: employeeNo, initialPassword }
     }),
   updateEmployeeIdentity: (no, req) =>
@@ -306,14 +310,14 @@ export const mockApi: Api = {
       if (statusOf(e) === 'RESIGNED') throw new ApiError(409, '퇴사한 직원은 조회할 수 없습니다.')
       if (!e.birthDate) throw new ApiError(422, '생년월일이 확인되지 않아 조회할 수 없습니다.')
       if (checksOf(no).some((c) => c.status === 'pending')) throw new ApiError(409, '진행 중인 조회가 있습니다.')
-      const c = bg(db.nextBgId++, no, Math.random() < 0.8 ? 'clear' : 'flagged', Date.now(), null)
-      db.checks.push(c)
+      const c = bg(data().nextBgId++, no, Math.random() < 0.8 ? 'clear' : 'flagged', Date.now(), null)
+      data().checks.push(c)
       return toBgSummary(c)
     }, 600),
   getBackgroundCheckDetail: (id) =>
     delay(() => {
       requireRole('ADMIN')
-      const c = db.checks.find((x) => x.id === id)
+      const c = data().checks.find((x) => x.id === id)
       if (!c) throw new ApiError(404, '조회 결과를 찾을 수 없습니다.')
       settle(c)
       return {
