@@ -1102,3 +1102,27 @@
   - 로그인 중인 직원을 오늘 차단하면 다음 요청에서 로그인 화면으로 가고, 재로그인에 실패한다. 차단 취소 후 다시 로그인된다. EMP-003 로그인도 확인했다.
   - BG API는 아직 없어서 404다. 화면에는 "요청을 처리하지 못했어요 (HTTP 404)"로 보인다.
 - 8080은 사용자가 IntelliJ로 띄운 백엔드(`employee-portal/backend`)라 건드리지 않았다. 그래서 8081과 `API_PROXY_TARGET`으로 붙였다.
+
+**main 재병합과 프론트 계약 맞추기 (사용자 지시 9가지)**
+- main을 다시 병합하자 `feat/frontend-views`(PR #5)가 들어왔다. AI_LOG 충돌은 양쪽 섹션을 모두 살려서 해결했다.
+- 프론트는 백엔드보다 먼저 README의 예정 형태("[미구현]")로 작성돼 있어서 신원조회 계약이 어긋났다.
+  - 소문자 상태, `needs_attention`, `latestBgStatus`, `state: DONE`
+  - 그대로 병합하면 배지와 알림이 동작하지 않는다. 백엔드(사용자가 확정한 상태 이름)를 기준으로 프론트를 고쳤다.
+- 반영한 것(사용자 지시):
+  - progress 3값. NOT_COMPLETED는 "완료되지 않음"으로 표시한다.
+  - 필드 추가: failureReason, latestCheckRequestedAt, 상세의 employeeNo와 fullName
+  - "결과 보기"는 CLEAR·FLAGGED에서만 보인다. UNRESOLVED·FAILED 행에는 사유와 다음 행동을 안내한다.
+  - PENDING이 UNRESOLVED나 FAILED로 끝나면 오류 토스트를 띄운다.
+  - 요청 버튼은 PENDING일 때만 막는다(재요청 가능).
+  - 오류 문구 4개를 해요체로 추가했다.
+  - 목록 BG 열을 항상 보여 준다.
+  - frontend README 상태 색 표: "추적 실패"를 "결과 미확인"으로 바꾸고 "요청 실패" 행을 추가했다(빨강, 같은 대비). `[미구현]` 표시를 지웠다.
+- AI가 추가로 고친 것:
+  - `EmployeeDetail`이 `EmployeeSummary`를 포함해서, 백엔드 상세에 없는 최신 조회 필드가 타입에 있었다. 공통 부분(`EmployeeBase`)으로 나눴다.
+  - 결정과 어긋난 문구를 고쳤다: "열람 기록이 남아요"(열람 기록은 빼기로 함), "Retry-After 따름"(따르지 않음), "승인·이력 없음"(변경 기록이 있음).
+  - 목 API의 오류 코드를 서버 코드와 같게 맞췄다. EMP-010은 항상 UNRESOLVED로 끝나게 해서 빨간 배지를 확인할 수 있게 했다.
+- 검증:
+  - `npm run build`(tsc + vite)와 `npm run lint`를 통과했다.
+  - 사용자가 지정한 grep(`'pending'|'clear'|'flagged'|needs_attention|state ===`)의 남은 결과는 0건이다.
+  - **하지 못한 것**: 목 모드와 실제 백엔드에서 브라우저로 "요청 → 결과 보기"를 한 번씩 돌려 보는 확인(사용자 지시 9-2). 사용자가 여기서 정리하고 main에 병합하기로 해서 남겨 뒀다. 백엔드 흐름은 앞서 API로 실제 호출을 확인했다.
+- 환경 문제: `~/.npm` 캐시에 쓰기 권한 오류(EACCES)가 나서 scratchpad의 임시 캐시(`--cache`)로 설치했다. 사용자 캐시는 건드리지 않았다.
