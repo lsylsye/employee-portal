@@ -46,3 +46,16 @@ bg:
   # 접근 차단일 + 이 기간이 지난 신원조회 결과는 조회 때 보여 주지 않는다(DECISIONS (3)).
   # 회사 정책 값이다(법적 근거 미확인). 실제 삭제(스케줄러)는 범위 밖이다.
   retention-after-block: 1y
+  # 주소는 비밀이 아니라 기본값을 둔다. 테스트는 닫힌 로컬 포트로 덮어쓴다(build.gradle).
+  base-url: ${BGCHECK_BASE_URL:https://54capvm12g.execute-api.ap-northeast-2.amazonaws.com}
+  # 후보자 키. 기본값 없음(누락 시 기동 실패). 로그·응답에 남기지 않는다.
+  api-key: ${BGCHECK_API_KEY}
+  # ⚠️ 임시값 — 실측(MEASUREMENTS.md) 확정 후 근거와 함께 교체한다.
+  connect-timeout: 5s
+  read-timeout: 30s
+  polling:
+    enabled: true
+    interval: 10s          # ⚠️ 임시값
+    max-attempts: 30       # ⚠️ 임시값
+    # check_id 없이 이보다 오래된 PENDING 은 UNRESOLVED 로 복구한다(행 생성 직후 서버 중단 대비).
+    orphan-pending-after: 5m   # ⚠️ 임시값
