@@ -1,6 +1,9 @@
 # 과제 원문 (public 레포에 올리지 않음)
 *.zip
 
+# Claude Code 로컬 작업 규칙
+CLAUDE.md
+
 # IDE
 .idea/
 *.iml
