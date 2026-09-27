@@ -1,17 +1,5 @@
-:root {
-  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
-  line-height: 1.5;
-  color: #1f2328;
-  background: #ffffff;
-}
+@import 'tailwindcss';
 
-body {
-  margin: 0;
-}
-
-nav,
-main {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 16px;
+@theme {
+  --font-sans: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
