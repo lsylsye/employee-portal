@@ -51,9 +51,17 @@ class EmployeeListLatestCheckTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired EntityManagerFactory entityManagerFactory;
 
+    /**
+     * N+1 이 드러날 조건: 직원 여러 명(아래 4명)이 각각 계정과 신원조회 기록을 가진다.
+     * 직원마다 연관 데이터를 따로 읽는 코드였다면 쿼리 수가 1 + 직원 수로 늘어난다.
+     */
     @BeforeEach
     void setUp() {
         jdbc.update("INSERT INTO account (login_id, password_hash, role) VALUES ('test-admin', 'x', 'ADMIN')");
+        for (String employeeNo : List.of("EMP-001", "EMP-002", "EMP-008", "EMP-009")) {
+            jdbc.update("INSERT INTO account (login_id, password_hash, role, employee_id) "
+                    + "SELECT ?, 'x', 'EMPLOYEE', id FROM employee WHERE employee_no = ?", employeeNo, employeeNo);
+        }
         // EMP-001: 이전 CLEAR, 최신 FLAGGED → FLAGGED
         check("EMP-001", "CLEAR", "2026-09-01T00:00:00Z");
         check("EMP-001", "FLAGGED", "2026-09-20T00:00:00Z");
@@ -90,6 +98,7 @@ class EmployeeListLatestCheckTest {
         List<Summary> list = adminEmployeeService.list();
 
         assertThat(list).hasSize(10);
+        assertThat(list).filteredOn(summary -> summary.latestCheckStatus() != null).hasSizeGreaterThanOrEqualTo(3);
         assertThat(statistics.getPrepareStatementCount()).isEqualTo(1);
 
         // 계수기가 실제로 쿼리마다 오르는지 확인(항상 1이면 N+1 이 생겨도 못 잡는다)
