@@ -1,0 +1,5 @@
+# 로컬 개발 전용 동작 (./gradlew bootRun 에서만 켜진다. 배포는 java -jar 라서 켜지지 않는다)
+logging:
+  level:
+    # 실행되는 SQL 을 본다. 바인딩 값(개인정보)은 찍지 않는다(N6).
+    org.hibernate.SQL: debug
