@@ -44,7 +44,7 @@
 | 메서드 | 경로 | 설명 |
 |---|---|---|
 | GET | `/api/me/profile` | 내 인적사항 |
-| PATCH | `/api/me/profile` | 연락처, 이메일, 주소, 비상연락처만 수정. 성명·생년월일은 수정 불가 |
+| PATCH | `/api/me/profile` | 연락처, 이메일, 주소, 비상연락처만 수정. 성명·생년월일은 수정 불가(보내도 무시). 즉시 반영하고 바뀐 필드 이름만 기록(판단 4) |
 | GET | `/api/me/background-checks` | 조회 일자와 진행 상태만. 판정·상세 결과는 주지 않는다 |
 
 ### 관리자: 직원 — `feat/admin-employee`
@@ -69,6 +69,40 @@
 |---|---|---|
 | GET | `/api/health` | 헬스체크(공개) |
 
+## 데이터 모델
+
+### 관계와 제약
+| 관계 | 카디널리티 | 구현 | 제약 | 삭제 정책 |
+|---|---|---|---|---|
+| 직원 : 계정 | 1 : 0..1 | `account.employee_id` NULL 허용 + UNIQUE(`account_employee_uk`) | `account_role_ck`: ADMIN 이면 `employee_id` NULL, EMPLOYEE 면 NOT NULL | RESTRICT |
+| 직원 : 변경 기록 | 1 : N | `employee_change_log.employee_id` NOT NULL | `field_name` 허용 목록 CHECK | RESTRICT |
+| 계정(수정한 사람) : 변경 기록 | 1 : N | `employee_change_log.changed_by` NOT NULL | — | RESTRICT |
+| 직원 : 신원조회 *(예정, `feat/background-check`)* | 1 : N | `background_check.employee_id` NOT NULL | 직원당 `PENDING` 하나(조건부 유니크) | RESTRICT |
+| 신원조회 열람 기록 *(예정)* | — | 직원·계정만 참조. **신원조회 행은 FK 로 참조하지 않는다** | 결과 값·checkId 없음 | — |
+| 계정 : 세션 | 1 : N (논리) | `spring_session.principal_name` = `login_id`. FK 아님(Spring Session 테이블) | — | 퇴사 처리 시 앱이 삭제 |
+
+- **삭제 정책은 RESTRICT.** 직원은 삭제하지 않는다(퇴사도 레코드를 보존하고 차단일만 둔다). 실수로 지우려 하면 DB 가 막는다.
+- 열람 기록이 신원조회 행을 FK 로 참조하지 않는 이유: 보관 기간이 지나면 신원조회 행을 파기(삭제)하는데, 감사 기록은 남아야 한다.
+- 접근 차단일은 계정이 아니라 **직원**에 둔다(퇴사는 인사상의 사실). 계정은 연결된 직원의 차단일로 판단하고, 연결이 없으면 ADMIN 만 통과한다(fail-closed).
+
+### 다대다는 두지 않았다
+- 계정당 권한이 하나(ADMIN 또는 EMPLOYEE)라서 `account.role` 칼럼으로 충분하다.
+- 권한이 여러 개 필요해지면(예: BG 열람 권한 분리) `account_roles(account_id, role)` 중간 테이블로 확장한다.
+
+### 의도한 비정규화: 성명
+- `employee.full_name` 은 `last_name || first_name` 과 중복이다. **의도한 비정규화다.**
+  - 과제 원문의 성명 문자열을 그대로 보존하고, BG API 에는 성·이름을 따로 보내야 한다(복성은 문자열 규칙으로 나눌 수 없다).
+  - 어긋남은 CHECK 제약 `employee_name_split_ck (full_name = last_name || first_name)` 으로 막는다. 앱도 성·이름을 고칠 때 성명을 다시 만든다.
+- 그 밖의 비정규화는 하지 않는다. 예: 관리자 목록의 "직원별 최신 신원조회 상태"를 직원 테이블에 복사하지 않고 조회 때 가져온다(아래).
+
+### 신원조회 테이블 설계 *(예정, `feat/background-check` 에서 구현)*
+- 인덱스
+  - `(employee_id, requested_at DESC)`: 직원별 이력과 최신 1건
+  - `status = 'PENDING'` 부분 인덱스: 백그라운드 폴링 대상 조회
+  - `(employee_id) WHERE status = 'PENDING'` 조건부 유니크: 같은 직원에게 진행 중인 조회가 둘 생기지 않게 DB 에서 막는다(중복 실행 409)
+- 관리자 목록의 최신 상태: N+1 없이 단일 쿼리(`DISTINCT ON (employee_id) ... ORDER BY employee_id, requested_at DESC`)로 가져온다. 쿼리 수가 1번인지 테스트로 확인한다.
+- 이 규모(직원 수십 명)에서는 비정규화 없이 조회로 충분하다.
+
 ## 개발 편의 도구 (운영에서는 비활성화)
 | 도구 | 로컬 | 운영(Railway) |
 |---|---|---|
@@ -91,3 +125,5 @@
 | BG 열람 권한 분리 | 관리자 전체가 열람한다. 관리자가 1명이라 분리해도 시연할 수 없다. |
 | 직원 본인의 BG 결과 열람 | 조회 사실만 보여 준다. 관리자 검토 전 공개와 정정 경로 부재 때문이다. 확장한다면 관리자 검토 후 공개. |
 | API 명세 yaml | 이 표와 로컬 Swagger(코드에서 자동 생성)로 대신한다. |
+| 변경 기록 조회 API·화면 | 변경 기록은 DB(`employee_change_log`)에만 남긴다. 분쟁·계정 탈취 확인 때 DB 에서 조회한다. |
+| 변경 전후 값 기록 | 누가·언제·어떤 필드만 남긴다. 과거 연락처·주소가 쌓이지 않게(최소 수집). 대신 탈취 후 원래 값으로 되돌릴 수는 없다. |
