@@ -227,7 +227,7 @@ out.push('- 한 시도: 무작위 원자료 1건. 지연 ≤ 시도 타임아웃
   let seed = 42
   const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
   const pool = g60.map((r) => ({ lat: r.errorClass === 'timeout' ? r.timeoutMs : r.latencyMs, ok: isOk(r) }))
-  const sim = (T, B, trials = 20_000) => {
+  const sim = (T, B, trials = 20_000, maxTries = Infinity) => {
     let succ = 0
     const waits = []
     let tries = 0
@@ -240,7 +240,7 @@ out.push('- 한 시도: 무작위 원자료 1건. 지연 ≤ 시도 타임아웃
         n++
         if (a.ok && a.lat <= cap) { t += a.lat; succ++; waits.push(t); break }
         t += Math.min(a.lat, cap)
-        if (t >= B - 1) { waits.push(B); break }
+        if (t >= B - 1 || n >= maxTries) { waits.push(t); break }
       }
       tries += n
     }
@@ -255,6 +255,11 @@ out.push('- 한 시도: 무작위 원자료 1건. 지연 ≤ 시도 타임아웃
       rows.push([`${B / 1000}s`, T === 30_500 ? '30.5s(상한 대기)' : `${T / 1000}s`, pct(r.p), ms(r.p95), r.tries.toFixed(1)])
     }
   out.push(table(['전체 예산', '시도당 타임아웃', '예산 안 성공 확률', '사용자 대기 p95', '평균 시도 수'], rows))
+  out.push('\n시도 횟수 상한을 함께 둘 때 (예산 10s, 시도당 2s):\n')
+  out.push(table(['최대 시도', '성공 확률', '대기 p95', '평균 시도 수'], [3, 4, 5, 6, 8, Infinity].map((m) => {
+    const r = sim(2_000, 10_000, 20_000, m)
+    return [m === Infinity ? '제한 없음' : m, pct(r.p), ms(r.p95), r.tries.toFixed(1)]
+  })))
 }
 
 // ---------- 7. E1 pending → 최종 소요 시간 ----------
