@@ -11,9 +11,9 @@ import { MyProfilePage } from './pages/MyProfilePage'
 function NotFound() {
   return (
     <div className="p-8 text-center">
-      <h1 className="text-lg font-semibold text-gray-900">페이지를 찾을 수 없습니다</h1>
-      <Link to="/" className="mt-2 inline-block text-sm text-blue-600 hover:underline">
-        처음으로
+      <h1 className="text-lg font-semibold">페이지를 찾을 수 없어요</h1>
+      <Link to="/" className="mt-2 inline-block text-sm text-primary hover:underline">
+        처음으로 가기
       </Link>
     </div>
   )
