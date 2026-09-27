@@ -105,3 +105,63 @@
 | (2) BG 실행 시점 | 비동기 요청, 백그라운드 폴링, 재시도 | `@Async`/`@Scheduled`는 기본 기능. 재시도는 Boot 4면 기본 `@Retryable`, Boot 3.5면 spring-retry 수동 추가 |
 | (3) BG 보관·열람 통제 | 기한 지난 결과 자동 삭제, 역할 기반 열람, 열람 로그, 필드 암호화 | 스케줄러, method security, JPA Auditing, `AttributeConverter` 모두 기존 의존성으로 가능 |
 | (4) 정보 수정 절차 | 승인 흐름, 변경 이력 | 테이블 설계로 해결. Hibernate Envers는 Initializr에 없고, 설명하기 쉽도록 이력 테이블을 직접 만드는 쪽을 권장 |
+
+**확정 — Initializr 결과 (사용자가 직접 생성)**
+- Spring Boot **4.0.8**, Java 17, Gradle 9.7.1(Groovy), 패키지 `com.bitcomputer.employee_portal`
+- 의존성: webmvc, security, data-jpa, flyway(+postgresql), validation, actuator, **Lombok 포함**(AI 추천 수용, 허용 어노테이션 제한 규칙 적용)
+
+**확정 — 브랜치 전략과 순서**
+- 규칙: `<type>/<scope>`(type은 chore, feat, docs, fix, refactor), PR은 merge commit으로 병합한다. AI가 틀려서 고친 커밋을 이력에 남기기 위해서다.
+- 순서:
+  1. `chore/deploy-setup`
+  2. `docs/bg-api-measurement`: 3~5번과 병행
+  3. `feat/employee-schema`
+  4. `feat/auth`
+  5. `feat/admin-employee`
+  6. `feat/my-profile`
+  7. `feat/background-check`
+  8. `docs/submission`
+- 순서 근거:
+  - 배포를 먼저 해서 이후 PR을 모두 실제 URL에서 확인한다.
+  - 실측을 앞당긴다. 대기 시간은 작업 시간에서 제외되고, 7번의 타임아웃·재시도 값이 실측 결과에 달려 있다.
+  - 3~7번은 의존 관계 순서다. 판단 쟁점은 해당 브랜치를 시작하기 직전에 논의한다.
+- 사용자가 브랜치를 직접 만들고 전환했다(git 작업은 사용자가 주도).
+
+### 2026-09-27 · `chore/deploy-setup`
+
+**AI 제안을 사용자 지적으로 바꾼 것 ① — DB 접속 정보 기본값** (A 항목 후보)
+- AI가 처음 제안한 것: `${PGHOST:localhost}`, `${PGUSER:postgres}`, `${PGPASSWORD:}`처럼 모든 접속 정보에 로컬 기본값을 두고 프로필은 나누지 않는다.
+- 사용자 지적: "비밀번호도 기본값으로 두는 게 맞나?"
+- 바꾼 것:
+  - 접속 정보(`PG*`)는 **기본값 없이** 필수로 한다.
+  - 로컬 값은 `backend/.env`(gitignore 대상)에서 `spring.config.import: optional:file:.env[.properties]`로 읽는다.
+  - 형식은 `.env.example`로 커밋한다.
+  - `PORT`만 기본값 8080을 둔다. 비밀이 아니고 Railway가 항상 주입한다.
+- 근거:
+  - 기본값이 있으면 Railway 변수 연결이 빠져도 앱이 localhost로 조용히 떨어진다. 그러면 원인이 가려진 `connection refused`가 난다.
+  - 기본값이 없으면 시작 시점에 `Could not resolve placeholder`로 바로 실패한다.
+  - 나중에 `BGCHECK_API_KEY`에도 같은 원칙을 적용한다.
+- 반대 선택의 장점: clone 후 `.env` 없이 바로 실행된다.
+
+**AI가 처음에 잘못 만든 것 ① — 로컬 DB 사용자 기본값** (B 항목 후보, 코드 리딩으로 발견)
+- AI가 `PGUSER` 기본값을 `postgres`로 계획했다.
+- 하지만 Homebrew로 설치한 Postgres에는 `postgres` 계정이 없고, 설치할 때 macOS 사용자 이름으로 관리자 계정이 만들어진다.
+- 그대로 갔다면 로컬에서 `role "postgres" does not exist` 오류가 났을 것이다.
+- 위의 기본값 논의 중에 발견했고, `.env`에 실제 로컬 사용자를 적는 방식으로 해결했다.
+
+**AI 제안을 사용자 지적으로 바꾼 것 ② — SPA 폴백 범위** (A 항목 후보)
+- AI가 처음 제안한 것: 파일이 없고 `/api`가 아니면 전부 `index.html`로 폴백한다.
+- 사용자 지적: "확장자가 있는데 파일이 없을 때는 404로 보내야 할 것 같다."
+- 바꾼 것: 마지막 경로 조각에 확장자(`.`)가 있으면 폴백하지 않고 404를 반환한다.
+- 근거:
+  - 재배포 직후 열려 있던 페이지가 옛 해시의 JS를 요청하면, 폴백 시 200과 HTML이 와서 `MIME type "text/html"` 오류로 원인이 가려진다.
+  - favicon이나 오타 난 경로도 404로 드러나야 한다.
+- 제약: 화면 경로 마지막 조각에 `.`이 들어가면 404가 난다. 이 과제의 경로는 사번과 id만 써서 괜찮다.
+- 다른 방법: `Accept: text/html`일 때만 폴백한다. 더 정확하지만 설명과 테스트가 복잡해서 택하지 않았다.
+
+**그 밖의 결정 (AI 제안, 사용자 승인)**
+- DB 접속에 `DATABASE_URL`이 아니라 `PG*` 변수를 쓴다. Railway의 `DATABASE_URL`은 `postgresql://user:pw@host` 형식이라 JDBC에 그대로 넣을 수 없다.
+- SPA 새로고침 처리는 `PathResourceResolver`로 한다. Spring 7의 경로 패턴이 `/**/{path}` 형태를 막아서 컨트롤러 forward 방식 대신 이 방식을 택했다.
+- 임시 SecurityConfig를 둔다. health와 정적 파일은 열고 `/api/**`는 인증을 요구한다. `feat/auth`에서 교체한다.
+- Docker 빌드에서는 테스트를 제외한다(`-x test`). contextLoads 테스트가 DB를 요구해서, 테스트는 로컬 DB로 따로 돌린다.
+- Railway 첫 배포는 배포 브랜치를 임시로 `chore/deploy-setup`에 두고 확인한다. 병합 후 `main`으로 되돌린다.
