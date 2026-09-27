@@ -42,6 +42,14 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// 테스트는 개발 DB와 섞이지 않게 별도 DB를 쓴다. 나머지 접속 정보는 .env 를 그대로 쓴다.
+	// (OS 환경변수가 .env 파일보다 우선한다)
+	environment 'PGDATABASE', 'employee_portal_test'
+}
+
+// 로컬 실행에서만 local 프로필(SQL 로그)을 켠다.
+tasks.named('bootRun') {
+	systemProperty 'spring.profiles.active', 'local'
 }
 
 // Dockerfile 이 버전 번호와 무관하게 결과물을 찾도록 이름을 고정한다.
