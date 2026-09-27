@@ -16,6 +16,13 @@ spring:
     hibernate:
       # 스키마 변경은 Flyway 만 담당한다.
       ddl-auto: validate
+  session:
+    # 세션은 DB(spring_session)에 저장한다. 퇴사 처리 시 사용자별로 세션 행을 찾아 삭제하기 위함.
+    # 30분 동안 요청이 없으면 만료된다(Spring 기본값이지만 판단 근거라서 명시한다).
+    timeout: 30m
+    jdbc:
+      # 테이블은 Flyway(V1__spring_session.sql)가 만든다.
+      initialize-schema: never
 
 server:
   # Railway 가 PORT 를 주입한다. 비밀값이 아니므로 로컬 기본값을 둔다.
@@ -26,3 +33,11 @@ management:
     web:
       exposure:
         include: health
+
+springdoc:
+  # 기본(=운영)에서는 끈다. 민감정보를 다루는 사이트라 API 구조를 공개 URL 에 드러내지 않는다.
+  # 로컬은 application-local.yaml 에서 켠다.
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
