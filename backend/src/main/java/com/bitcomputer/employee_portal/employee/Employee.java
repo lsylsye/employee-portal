@@ -38,9 +38,19 @@ public class Employee {
     private String address;
     private String emergencyContact;
 
+    /** 접근 차단일(퇴사일). 이 날 00:00 KST 부터 차단한다. null 이면 재직 중. */
+    private LocalDate accessBlockedOn;
+
     @Column(insertable = false, updatable = false)
     private Instant createdAt;
 
     @Column(insertable = false)
     private Instant updatedAt;
+
+    /**
+     * today 는 KST 기준 날짜여야 한다(Clock 주입). 차단일 당일 00:00 부터 차단이므로 당일도 포함한다.
+     */
+    public boolean isAccessBlockedOn(LocalDate today) {
+        return accessBlockedOn != null && !today.isBefore(accessBlockedOn);
+    }
 }
