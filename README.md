@@ -15,8 +15,7 @@
 ## API 목록
 
 > 구현 브랜치 순서대로 채운다. 명세 yaml 은 따로 쓰지 않는다(6시간 기준 비용 대비 효과가 작다).
-> 구현된 API 는 로컬에서 Swagger UI 로 확인한다: `./gradlew bootRun` → http://localhost:8080/swagger-ui.html
-> (springdoc 이 컨트롤러에서 자동 생성한다. 배포 환경에서는 꺼져 있다.)
+> 구현된 API 는 로컬 Swagger UI 로 확인한다(아래 "개발 편의 도구").
 
 ### 공통
 - 인증: 세션 쿠키. 상태를 바꾸는 요청(POST/PUT/PATCH/DELETE)은 CSRF 토큰 헤더가 필요하다.
@@ -70,6 +69,18 @@
 |---|---|---|
 | GET | `/api/health` | 헬스체크(공개) |
 
+## 개발 편의 도구 (운영에서는 비활성화)
+| 도구 | 로컬 | 운영(Railway) |
+|---|---|---|
+| Swagger UI / OpenAPI 문서 (springdoc) | `./gradlew bootRun`(local 프로필) → http://localhost:8080/swagger-ui.html | **꺼짐.** 켜져 있으면 누구나 API 목록과 요청 형식을 볼 수 있다. |
+| SQL 로그 | local 프로필에서 켜짐(바인딩 값은 찍지 않음) | 꺼짐 |
+
+- 기본 설정(`application.yaml`)이 곧 운영 설정이고, 여기서 springdoc 을 끈다. 로컬은 `application-local.yaml` 에서만 켠다.
+  Railway 는 `java -jar` 로 실행되어 local 프로필이 켜지지 않는다. `SPRING_PROFILES_ACTIVE` 변수를 Railway 에 넣지 않는다.
+- `SwaggerDisabledByDefaultTest` 가 기본 설정에서 OpenAPI 문서가 노출되지 않는지 확인한다.
+- Swagger 에서 시험하는 순서: `GET /api/auth/csrf` → `POST /api/auth/login` → 나머지. CSRF 쿠키 값은 Swagger 가 헤더로 자동으로 싣는다.
+- IntelliJ 로 실행할 때는 Active profiles 에 `local` 을 직접 지정한다(`bootRun` 을 거치지 않기 때문).
+
 ## 넣지 않은 것
 | 항목 | 이유 |
 |---|---|
@@ -79,4 +90,4 @@
 | 첫 로그인 시 비밀번호 변경 강제 | 평가자 여럿이 같은 계정을 쓴다. 한 명이 바꾸면 나머지가 로그인할 수 없다. |
 | BG 열람 권한 분리 | 관리자 전체가 열람한다. 관리자가 1명이라 분리해도 시연할 수 없다. |
 | 직원 본인의 BG 결과 열람 | 조회 사실만 보여 준다. 관리자 검토 전 공개와 정정 경로 부재 때문이다. 확장한다면 관리자 검토 후 공개. |
-| API 명세 yaml, 배포 환경 Swagger | 명세는 이 표와 로컬 Swagger(코드에서 자동 생성)로 대신한다. 배포에서는 API 구조를 공개 URL 에 드러내지 않는다. |
+| API 명세 yaml | 이 표와 로컬 Swagger(코드에서 자동 생성)로 대신한다. |
