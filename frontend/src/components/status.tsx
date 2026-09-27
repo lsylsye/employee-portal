@@ -1,10 +1,10 @@
-import { Ban, CircleCheck, CircleMinus, CircleX, Clock, Loader2, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { Ban, CircleCheck, CircleHelp, CircleMinus, CircleX, Clock, Loader2, TriangleAlert, type LucideIcon } from 'lucide-react'
 import type { BgStatus, EmploymentStatus } from '@/api'
 import { Badge } from '@/components/ui/badge'
 
 // 상태 배지 규칙 (README 디자인 섹션 표와 같게 유지한다)
 // - 색만으로 구분하지 않는다: 항상 글자 + 아이콘 (색각 이상 사용자 고려)
-// - 주황은 검토 필요(flagged)와 퇴사 예정에만. 빨강은 시스템 오류(추적 실패)에만. 사람에 대한 판정(flagged)은 주황으로 둬서 화면이 인사 판단을 앞서가지 않게 한다
+// - 주황은 검토 필요(FLAGGED)와 퇴사 예정에만. 빨강은 시스템 오류(결과 미확인·요청 실패)에만. 사람에 대한 판정(FLAGGED)은 주황으로 둬서 화면이 인사 판단을 앞서가지 않게 한다
 
 type Tone = 'success' | 'info' | 'warning' | 'danger' | 'neutral'
 
@@ -57,28 +57,34 @@ export function BgBadge({ status }: { status: BgStatus | null }) {
           조회 안 함
         </StatusBadge>
       )
-    case 'pending':
+    case 'PENDING':
       return (
         <StatusBadge tone="info" icon={Loader2} spin>
           조회 중
         </StatusBadge>
       )
-    case 'clear':
+    case 'CLEAR':
       return (
         <StatusBadge tone="success" icon={CircleCheck}>
           이상 없음
         </StatusBadge>
       )
-    case 'flagged':
+    case 'FLAGGED':
       return (
         <StatusBadge tone="warning" icon={TriangleAlert}>
           검토 필요
         </StatusBadge>
       )
-    case 'needs_attention':
+    case 'UNRESOLVED':
+      return (
+        <StatusBadge tone="danger" icon={CircleHelp}>
+          결과 미확인
+        </StatusBadge>
+      )
+    case 'FAILED':
       return (
         <StatusBadge tone="danger" icon={CircleX}>
-          추적 실패
+          요청 실패
         </StatusBadge>
       )
   }

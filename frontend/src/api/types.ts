@@ -1,7 +1,6 @@
 // 프론트 ↔ 백엔드 API 계약. 기준은 루트 README "API 목록"이다.
 // 날짜는 'YYYY-MM-DD'(KST 기준 날짜), 시각은 ISO-8601 UTC 문자열. 화면에서 KST로 바꿔 보여준다(N15).
-// 필드 이름은 백엔드 엔티티(Employee)와 같게 둔다. [미구현] 표시는 백엔드가 아직 없는 API 라서,
-// 구현할 때 이 이름을 따르거나 여기를 고친다.
+// 필드 이름은 백엔드 응답(DTO)과 같게 둔다.
 
 export type Role = 'ADMIN' | 'EMPLOYEE'
 
@@ -40,8 +39,11 @@ export type MyProfile = ContactFields & {
  */
 export type UpdateMyProfileRequest = { [K in keyof ContactFields]: string }
 
-/** [미구현] GET /api/me/background-checks 항목. 조회 일자와 진행 상태만 (판단 3) */
-export type MyBackgroundCheck = { requestedAt: string; state: 'IN_PROGRESS' | 'DONE' }
+/**
+ * GET /api/me/background-checks 항목(BackgroundCheckDto.MyItem). 조회 일자와 진행 상태만 (판단 3 b안).
+ * NOT_COMPLETED 는 시스템 사정으로 끝나지 못한 것(결과 미확인·요청 실패)을 묶은 값이다. 판정(FLAGGED 등)을 드러내지 않는다.
+ */
+export type MyBackgroundCheck = { requestedAt: string; progress: 'IN_PROGRESS' | 'COMPLETED' | 'NOT_COMPLETED' }
 
 /**
  * 재직 상태. 저장하지 않고 접근 차단일과 오늘(KST)로 계산한다(DECISIONS 1).
@@ -51,22 +53,33 @@ export type MyBackgroundCheck = { requestedAt: string; state: 'IN_PROGRESS' | 'D
  */
 export type EmploymentStatus = 'ACTIVE' | 'BLOCK_SCHEDULED' | 'BLOCKED'
 
-/** 외부 API 상태 + 우리 쪽 폴링 포기 상태(N11, 화면 표기 "추적 실패") */
-export type BgStatus = 'pending' | 'clear' | 'flagged' | 'needs_attention'
+/**
+ * 신원 조회 상태(BackgroundCheckStatus). FLAGGED 와 UNRESOLVED 는 의미가 완전히 다르다.
+ * - PENDING 조회 중
+ * - CLEAR 이상 없음 / FLAGGED 검토 필요: 외부 판정(사람이 볼 것)
+ * - UNRESOLVED 결과 미확인: 시스템이 결과를 모름(POST 타임아웃·5xx, 폴링 5분 초과, 복구). 외부 목록 조회로 생성 여부 확인 가능
+ * - FAILED 요청 실패: 외부가 요청을 4xx 로 거절, 외부에 생성되지 않음
+ */
+export type BgStatus = 'PENDING' | 'CLEAR' | 'FLAGGED' | 'UNRESOLVED' | 'FAILED'
 
-/** GET /api/admin/employees 항목(AdminEmployeeDto.Summary). 동명이인 구분을 위해 사번·생년월일을 항상 같이 준다(F-i) */
-export type EmployeeSummary = {
+/** 목록·상세 공통 직원 필드. 동명이인 구분을 위해 사번·생년월일을 항상 같이 준다(F-i) */
+type EmployeeBase = {
   employeeNo: string
   fullName: string
   birthDate: string | null
   status: EmploymentStatus
   accessBlockedOn: string | null
-  /** 목록에는 판정만 (판단 3). [미구현] feat/background-check 에서 추가되기 전에는 필드가 없다 */
-  latestBgStatus?: BgStatus | null
 }
 
-/** GET /api/admin/employees/{employeeNo} (AdminEmployeeDto.Detail) */
-export type EmployeeDetail = EmployeeSummary &
+/** GET /api/admin/employees 항목(AdminEmployeeDto.Summary) */
+export type EmployeeSummary = EmployeeBase & {
+  /** 최신 신원 조회 판정만 (판단 3). 조회가 없거나 보관 기간이 지났으면 null */
+  latestCheckStatus: BgStatus | null
+  latestCheckRequestedAt: string | null
+}
+
+/** GET /api/admin/employees/{employeeNo} (AdminEmployeeDto.Detail). 최신 신원 조회 필드는 없다 */
+export type EmployeeDetail = EmployeeBase &
   ContactFields & {
     /** lastName = 성. 문자열 분리가 아니라 저장된 값을 쓴다 */
     lastName: string
@@ -106,19 +119,24 @@ export type UpdateEmployeeRequest = {
 /** PUT /api/admin/employees/{employeeNo}/access-block. 그날 00:00 KST 부터 차단. 응답은 Detail(화면은 다시 읽는다) */
 export type AccessBlockRequest = { blockedOn: string }
 
-/** [미구현] GET /api/admin/employees/{employeeNo}/background-checks 항목. 판정만 */
+/** GET /api/admin/employees/{employeeNo}/background-checks 항목(BackgroundCheckDto.HistoryItem). 판정만, 최신순 */
 export type BgCheckSummary = {
   id: number
   requestedAt: string
   status: BgStatus
   completedAt: string | null
+  /** UNRESOLVED·FAILED 의 사유 코드(예: POLL_TIMEOUT, POST_400). 그 외에는 null */
+  failureReason: string | null
 }
 
 /**
- * [미구현] GET /api/admin/background-checks/{id}. "결과 보기"로 열 때만 호출하고, 열람 기록이 남는다.
- * creditScore는 수집하지 않는다(최소 수집). 응답은 Cache-Control: no-store.
+ * GET /api/admin/background-checks/{id} (BackgroundCheckDto.Detail). "결과 보기"로 열 때만 호출한다.
+ * 저장된 결과만 읽는다(외부 API 를 부르지 않는다). creditScore 는 수집하지 않는다(최소 수집). 응답은 Cache-Control: no-store.
+ * 보관 기간(차단일 + 1년)이 지났으면 404.
  */
 export type BgCheckDetail = BgCheckSummary & {
+  employeeNo: string
+  fullName: string
   criminalRecord: boolean | null
   educationVerified: boolean | null
   employmentVerified: boolean | null
