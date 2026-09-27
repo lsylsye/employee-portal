@@ -83,18 +83,20 @@ export default defineConfig([
 ### 상태 색
 
 배지는 색만으로 구분하지 않는다. 항상 **글자 + 아이콘**을 함께 쓴다(색각 이상 사용자 고려).
+옅은 배경 + 진한 글자 + 아이콘 방식이다. 글자는 4.5:1, 아이콘은 비텍스트라 3:1 이상이면 된다.
 
-| 상태 | 색 | 아이콘 | 토큰 |
-|---|---|---|---|
-| 재직 | 초록 | CircleCheck | `status-success` |
-| 퇴사 예정 | 주황 | Clock | `status-warning` |
-| 퇴사 | 회색 | Ban | `status-neutral` |
-| 조회 중 | 파랑 | 스피너(Loader2) | `status-info` |
-| 이상 없음 (clear) | 초록 | CircleCheck | `status-success` |
-| 검토 필요 (flagged) | 주황 | TriangleAlert | `status-warning` |
-| 추적 실패 | 빨강 | CircleX | `status-danger` |
-| 조회 안 함 | 회색 | CircleMinus | `status-neutral` |
+| 상태 | 색 | 아이콘 | 배경 / 글자 / 아이콘 | 글자 대비 | 아이콘 대비 |
+|---|---|---|---|---|---|
+| 재직, 이상 없음 (clear) | 초록 | CircleCheck | green 50 / 800 / 600 | 6.78 | 3.07 |
+| 조회 중 | 파랑 | 스피너(Loader2) | blue 50 / 800 / 600 | 8.11 | 4.82 |
+| 퇴사 예정, 검토 필요 (flagged) | 주황(amber) | Clock, TriangleAlert | amber 50 / 800 / 600 | 6.88 | 3.08 |
+| 추적 실패 | 빨강 | CircleX | red 50 / 800 / 600 | 7.67 | 4.36 |
+| 퇴사, 조회 안 함 | 회색 | Ban, CircleMinus | neutral 100 / 700 / 500 | 9.53 | 4.34 |
 
+- 대비는 배지 배경 기준이다. Tailwind 팔레트(OKLCH)를 sRGB로 바꿔 WCAG 2 공식으로 계산했다.
+- amber-100 배경은 아이콘 대비가 2.87이라 3:1에 못 미친다. 그래서 50을 쓴다.
+- 토큰: `src/index.css`의 `--status-<tone>-bg/-fg/-icon`.
+- 주황은 **검토 필요와 퇴사 예정에만** 쓴다. 생년월일 없음 같은 데이터 공백은 회색 글자로 둔다.
 - **flagged를 빨강으로 두지 않는 이유**: 명세상 "추가 검토 필요"이지 "문제 있음"이 아니다. 사람에 대한 판정에 빨강을 쓰면 화면이 인사 판단을 앞서간다. 그래서 주의 색(주황)으로 둔다.
 - **빨강은 시스템 오류(추적 실패)와 파괴적 동작(퇴사 처리)에만** 쓴다.
 - "검토 필요"와 "퇴사 예정"은 둘 다 "사람이 확인해야 하는 상태"라 같은 주황으로 묶는다.

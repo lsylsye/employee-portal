@@ -35,7 +35,7 @@ export function EmployeeDetailPage() {
                 <EmploymentBadge status={employee.status} />
               </span>
             }
-            description={`${employee.employeeNo} · 생년월일 ${employee.birthDate ?? '확인 필요'}`}
+            description={`${employee.employeeNo} · 생년월일 ${employee.birthDate ?? '확인되지 않음'}`}
           />
           <div className="grid gap-6">
             <div className="grid gap-6 lg:grid-cols-2">
@@ -106,7 +106,7 @@ function IdentityCard({ employee, onSaved }: { employee: EmployeeDetail; onSaved
             items={[
               ['성 (lastName)', employee.lastName],
               ['이름 (firstName)', employee.firstName],
-              ['생년월일', employee.birthDate ?? <span className="text-status-warning">확인 필요</span>],
+              ['생년월일', employee.birthDate ?? <span className="text-muted-foreground">확인되지 않음</span>],
             ]}
           />
         )}

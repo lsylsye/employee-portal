@@ -4,22 +4,23 @@ import { Badge } from '@/components/ui/badge'
 
 // 상태 배지 규칙 (README 디자인 섹션 표와 같게 유지한다)
 // - 색만으로 구분하지 않는다: 항상 글자 + 아이콘 (색각 이상 사용자 고려)
-// - 빨강은 시스템 오류에만. 사람에 대한 판정(flagged)은 주황으로 둬서 화면이 인사 판단을 앞서가지 않게 한다
+// - 주황은 검토 필요(flagged)와 퇴사 예정에만. 빨강은 시스템 오류(추적 실패)에만. 사람에 대한 판정(flagged)은 주황으로 둬서 화면이 인사 판단을 앞서가지 않게 한다
 
 type Tone = 'success' | 'info' | 'warning' | 'danger' | 'neutral'
 
-const toneClass: Record<Tone, string> = {
-  success: 'bg-status-success/10 text-status-success',
-  info: 'bg-status-info/10 text-status-info',
-  warning: 'bg-status-warning/10 text-status-warning',
-  danger: 'bg-status-danger/10 text-status-danger',
-  neutral: 'bg-status-neutral/10 text-status-neutral',
+// 옅은 배경 + 진한 글자(4.5:1) + 아이콘(3:1). 클래스 이름을 문자열 그대로 둬야 Tailwind 가 찾는다
+const toneClass: Record<Tone, { badge: string; icon: string }> = {
+  success: { badge: 'bg-status-success-bg text-status-success-fg', icon: 'text-status-success-icon' },
+  info: { badge: 'bg-status-info-bg text-status-info-fg', icon: 'text-status-info-icon' },
+  warning: { badge: 'bg-status-warning-bg text-status-warning-fg', icon: 'text-status-warning-icon' },
+  danger: { badge: 'bg-status-danger-bg text-status-danger-fg', icon: 'text-status-danger-icon' },
+  neutral: { badge: 'bg-status-neutral-bg text-status-neutral-fg', icon: 'text-status-neutral-icon' },
 }
 
 function StatusBadge({ tone, icon: Icon, spin = false, children }: { tone: Tone; icon: LucideIcon; spin?: boolean; children: string }) {
   return (
-    <Badge variant="outline" className={`border-transparent ${toneClass[tone]}`}>
-      <Icon data-icon="inline-start" aria-hidden className={spin ? 'animate-spin' : undefined} />
+    <Badge variant="outline" className={`border-transparent ${toneClass[tone].badge}`}>
+      <Icon data-icon="inline-start" aria-hidden className={`${toneClass[tone].icon} ${spin ? 'animate-spin' : ''}`} />
       {children}
     </Badge>
   )

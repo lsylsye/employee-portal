@@ -68,7 +68,7 @@ export function EmployeeListPage() {
                       </Link>
                     </TableCell>
                     <TableCell className="font-medium">{e.fullName}</TableCell>
-                    <TableCell>{e.birthDate ?? <span className="text-status-warning">확인 필요</span>}</TableCell>
+                    <TableCell>{e.birthDate ?? <span className="text-muted-foreground">확인되지 않음</span>}</TableCell>
                     <TableCell>
                       <EmploymentBadge status={e.status} />
                     </TableCell>

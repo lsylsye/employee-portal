@@ -1,4 +1,4 @@
-import { ArrowLeft, Loader2, TriangleAlert } from 'lucide-react'
+import { ArrowLeft, Info, Loader2 } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -54,8 +54,8 @@ export function EmployeeCreatePage() {
                 ['초기 비밀번호', <span className="font-mono">{created.initialPassword}</span>],
               ]}
             />
-            <p className="flex items-center gap-2 text-sm text-status-warning">
-              <TriangleAlert className="size-4 shrink-0" aria-hidden />
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden />
               초기 비밀번호는 지금만 볼 수 있어요.
             </p>
           </CardContent>
