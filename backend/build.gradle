@@ -42,3 +42,8 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// Dockerfile 이 버전 번호와 무관하게 결과물을 찾도록 이름을 고정한다.
+tasks.named('bootJar') {
+	archiveFileName = 'app.jar'
+}
