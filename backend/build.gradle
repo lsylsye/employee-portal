@@ -47,6 +47,9 @@ tasks.named('test') {
 	// 테스트는 개발 DB와 섞이지 않게 별도 DB를 쓴다. 나머지 접속 정보는 .env 를 그대로 쓴다.
 	// (OS 환경변수가 .env 파일보다 우선한다)
 	environment 'PGDATABASE', 'employee_portal_test'
+	// 테스트는 외부 BG API 를 절대 부르지 않는다(측정 오염 방지, 본인 키 외 호출 금지).
+	// 주소를 닫힌 로컬 포트로 덮어써서, 실수로 호출해도 외부에 닿지 않고 바로 실패한다. 클라이언트 테스트는 stub 으로 한다.
+	environment 'BGCHECK_BASE_URL', 'http://localhost:1'
 }
 
 // 로컬 실행에서만 local 프로필(SQL 로그)을 켠다.

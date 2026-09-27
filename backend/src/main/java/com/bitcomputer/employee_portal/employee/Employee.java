@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Period;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
@@ -148,10 +149,12 @@ public class Employee {
     }
 
     public EmploymentStatus statusOn(LocalDate today) {
-        if (accessBlockedOn == null) {
-            return EmploymentStatus.ACTIVE;
-        }
-        return isAccessBlockedOn(today) ? EmploymentStatus.BLOCKED : EmploymentStatus.BLOCK_SCHEDULED;
+        return EmploymentStatus.of(accessBlockedOn, today);
+    }
+
+    /** 접근 차단일 + 보관 기간이 지났으면 신원조회 결과를 보여 주지 않는다(DECISIONS (3), 필터링만). */
+    public boolean isBackgroundCheckRetentionExpired(LocalDate today, Period retentionAfterBlock) {
+        return accessBlockedOn != null && !accessBlockedOn.isAfter(today.minus(retentionAfterBlock));
     }
 
     /** 연락처 묶음. 필드별 null 은 "바꾸지 않음"이다. */

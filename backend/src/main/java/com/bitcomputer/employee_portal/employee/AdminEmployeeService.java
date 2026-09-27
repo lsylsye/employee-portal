@@ -3,6 +3,7 @@ package com.bitcomputer.employee_portal.employee;
 import com.bitcomputer.employee_portal.account.Account;
 import com.bitcomputer.employee_portal.account.AccountRepository;
 import com.bitcomputer.employee_portal.account.TemporaryPasswordGenerator;
+import com.bitcomputer.employee_portal.backgroundcheck.BackgroundCheckProperties;
 import com.bitcomputer.employee_portal.common.ApiException;
 import com.bitcomputer.employee_portal.common.ErrorCode;
 import com.bitcomputer.employee_portal.employee.AdminEmployeeDto.AccessBlockRequest;
@@ -13,7 +14,6 @@ import com.bitcomputer.employee_portal.employee.AdminEmployeeDto.Summary;
 import com.bitcomputer.employee_portal.employee.AdminEmployeeDto.UpdateRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.session.Session;
@@ -38,13 +38,16 @@ public class AdminEmployeeService {
     private final TemporaryPasswordGenerator temporaryPasswordGenerator;
     private final FindByIndexNameSessionRepository<? extends Session> sessionRepository;
     private final EmployeeChangeRecorder changeRecorder;
+    private final BackgroundCheckProperties backgroundCheckProperties;
     private final Clock clock;
 
+    /** 직원별 최신 신원조회 상태까지 쿼리 한 번으로 가져온다(EmployeeRepository.findAllWithLatestCheck). */
     @Transactional(readOnly = true)
     public List<Summary> list() {
         LocalDate today = today();
-        return employeeRepository.findAll(Sort.by("employeeNo")).stream()
-                .map(e -> Summary.of(e, today))
+        LocalDate retentionCutoff = today.minus(backgroundCheckProperties.retentionAfterBlock());
+        return employeeRepository.findAllWithLatestCheck(retentionCutoff).stream()
+                .map(row -> Summary.of(row, today))
                 .toList();
     }
 

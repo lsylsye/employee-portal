@@ -41,3 +41,8 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+bg:
+  # 접근 차단일 + 이 기간이 지난 신원조회 결과는 조회 때 보여 주지 않는다(DECISIONS (3)).
+  # 회사 정책 값이다(법적 근거 미확인). 실제 삭제(스케줄러)는 범위 밖이다.
+  retention-after-block: 1y
