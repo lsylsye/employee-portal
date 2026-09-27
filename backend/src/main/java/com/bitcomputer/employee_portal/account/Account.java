@@ -19,7 +19,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 
 /**
- * 로그인 계정. 접근 통제(퇴사 차단)는 계정 단위로 한다.
+ * 로그인 계정. 접근 차단일(퇴사일)은 인사상의 사실이라 직원이 가진다. 계정은 그 값으로 접근을 판단한다.
  * 관리자는 직원 레코드가 없고(employee = null), 직원 계정은 사번을 아이디로 쓴다.
  */
 @Entity
@@ -41,9 +41,6 @@ public class Account {
     @JoinColumn(name = "employee_id")
     private Employee employee;
 
-    /** 이 날 00:00 KST 부터 차단한다. null 이면 재직 중. */
-    private LocalDate accessBlockedOn;
-
     @Column(insertable = false, updatable = false)
     private Instant createdAt;
 
@@ -64,9 +61,16 @@ public class Account {
     }
 
     /**
-     * today 는 KST 기준 날짜여야 한다(Clock 주입). 차단일 당일 00:00 부터 차단이므로 당일도 포함한다.
+     * 접근 허용 여부. 실패하면 막히는 쪽(fail-closed)으로 판단한다.
+     * - 직원과 연결된 계정: 그 직원의 차단일로 판단한다.
+     * - 직원과 연결되지 않은 계정: ADMIN 만 통과한다. "연결된 직원이 없으면 통과"로 두면
+     *   연결이 빠진 일반 계정이 검사 없이 통과한다.
+     * today 는 KST 기준 날짜여야 한다(Clock 주입).
      */
-    public boolean isAccessBlockedOn(LocalDate today) {
-        return accessBlockedOn != null && !today.isBefore(accessBlockedOn);
+    public boolean isAccessAllowedOn(LocalDate today) {
+        if (employee != null) {
+            return !employee.isAccessBlockedOn(today);
+        }
+        return role == Role.ADMIN;
     }
 }

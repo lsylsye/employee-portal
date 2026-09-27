@@ -33,3 +33,11 @@ management:
     web:
       exposure:
         include: health
+
+springdoc:
+  # 기본(=운영)에서는 끈다. 민감정보를 다루는 사이트라 API 구조를 공개 URL 에 드러내지 않는다.
+  # 로컬은 application-local.yaml 에서 켠다.
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

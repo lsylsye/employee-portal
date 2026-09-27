@@ -10,7 +10,7 @@ import { loadApiKey } from './env.js'
 export const BASE_URL = 'https://54capvm12g.execute-api.ap-northeast-2.amazonaws.com'
 export const RAW_DIR = fileURLToPath(new URL('../raw/', import.meta.url))
 export const GLOBAL_CAP = 5000
-export const EXP_CAPS = { e0: 30, e1: 1500, e2: 1100, e3: 40, e4: 150, e5: 1100, e6: 200, e7: 750 }
+export const EXP_CAPS = { e0: 30, e1: 1500, e2: 1100, e3: 80, e4: 150, e5: 1100, e6: 200, e7: 750 }
 
 // 측정용으로 넉넉하게: 긴 꼬리 지연까지 관측하기 위함.
 // E0 에서 30초 타임아웃 2건, 404 응답도 8~30초가 관측되어 30s → 60s 로 늘렸다(30s 는 꼬리를 잘라버림).
@@ -85,9 +85,10 @@ export function createClient({ runId, exp, rps = 10, probeOnError = true, record
 
   async function request(method, path, { body, meta = {}, e = exp } = {}) {
     if (!hasBudget(e)) return { skipped: true, reason: 'budget' }
-    await throttle()
-    ownCount(e)
+    // 상한 확인 직후 await 없이 바로 예약한다. (throttle 대기 뒤에 세면, 대기 중이던 요청들이
+    // 모두 확인을 통과해 상한을 넘는다 — run1 E6 에서 203/200 으로 관측)
     counts[e]++
+    await throttle()
     inFlight++
 
     const rec = { ts: new Date().toISOString(), runId, exp: e, seq: ++seq, method, path, timeoutMs: REQUEST_TIMEOUT_MS, ...meta }
@@ -129,7 +130,9 @@ export function createClient({ runId, exp, rps = 10, probeOnError = true, record
       if (json.totalCount !== undefined) rec.totalCount = json.totalCount
       if (recordBody) rec.body = json
     }
-    appendFileSync(fileOf(e), JSON.stringify(rec) + '\n')
+    // 외부 API 가 GET 상세 응답 본문에 명세에 없는 tenant/tenantEmployee 필드로 후보자 키를 돌려준다(run1 에서 발견).
+    // 어떤 필드로 새어 들어오든 기록 직전에 키 문자열을 가린다.
+    appendFileSync(fileOf(e), JSON.stringify(rec).replaceAll(apiKey, '[REDACTED]') + '\n')
 
     if (method === 'GET' && probeOnError && e !== 'e6' && (rec.httpStatus === 500 || rec.httpStatus === 503)) {
       probes.push(probe(path, rec))
