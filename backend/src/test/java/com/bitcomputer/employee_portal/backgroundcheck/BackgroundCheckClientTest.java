@@ -40,7 +40,7 @@ class BackgroundCheckClientTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder().baseUrl(BASE).defaultHeader("X-Candidate-Key", "stub-key");
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new BackgroundCheckClient(builder.build());
+        client = new BackgroundCheckClient(builder.build(), builder.build());
     }
 
     static CreateRequest request() {
@@ -99,6 +99,24 @@ class BackgroundCheckClientTest {
 
         assertThat(outcome).isEqualTo(new FetchOutcome.Fetched(new BackgroundCheckClient.Result(
                 "flagged", true, true, false, Instant.parse("2026-10-01T01:02:03Z"))));
+    }
+
+    @Test
+    void GET_응답의_tenant_필드에_든_키는_옮기지_않는다() {
+        // 실측: GET 응답의 명세에 없는 tenant·tenantEmployee 필드에 후보자 키가 들어 있다(MEASUREMENTS §6)
+        server.expect(requestTo(BASE + "/background-checks/CHK-1"))
+                .andRespond(withSuccess("""
+                        {"checkId":"CHK-1","status":"clear","criminalRecord":false,"educationVerified":true,
+                         "employmentVerified":true,"completedAt":"2026-10-01T01:02:03Z",
+                         "tenant":"stub-key","tenantEmployee":"stub-key:EMP-003"}
+                        """, MediaType.APPLICATION_JSON));
+
+        FetchOutcome outcome = client.fetch("CHK-1");
+
+        assertThat(outcome.toString()).doesNotContain("stub-key");
+        assertThat(BackgroundCheckClient.Result.class.getRecordComponents())
+                .extracting(c -> c.getName())
+                .containsExactly("status", "criminalRecord", "educationVerified", "employmentVerified", "completedAt");
     }
 
     @Test

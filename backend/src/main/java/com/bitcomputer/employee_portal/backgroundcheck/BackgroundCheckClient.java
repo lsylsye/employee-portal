@@ -11,16 +11,20 @@ import java.time.LocalDate;
 
 /**
  * 외부 Background Check API 클라이언트. 브라우저는 CORS 로 직접 부를 수 없고, 키를 노출하지 않기 위해 서버가 중계한다.
- * - 재시도하지 않는다. POST 는 멱등키가 없어서(S5) 재시도가 중복 생성이 될 수 있고, GET 은 다음 폴링이 곧 재시도다.
+ * - 재시도하지 않는다. POST 는 멱등하지 않고(실측: 같은 내용 10회 → checkId 10개), GET 은 다음 폴링이 곧 재시도다(MEASUREMENTS §7-2).
+ * - 응답은 필요한 필드만 골라 옮긴다. GET 응답의 tenant 등 명세에 없는 필드에 후보자 키가 들어 있다(MEASUREMENTS §6).
  * - 로그에는 checkId·상태코드만 남긴다. 이름·생년월일·결과는 남기지 않는다(N6).
+ * - 경로마다 타임아웃이 달라서(POST 5초, 폴링 GET 31초) 연결을 둘로 나눈다.
  */
 @Slf4j
 public class BackgroundCheckClient {
 
-    private final RestClient restClient;
+    private final RestClient postClient;
+    private final RestClient pollClient;
 
-    public BackgroundCheckClient(RestClient restClient) {
-        this.restClient = restClient;
+    public BackgroundCheckClient(RestClient postClient, RestClient pollClient) {
+        this.postClient = postClient;
+        this.pollClient = pollClient;
     }
 
     /** POST 요청 본문. lastName = 성, firstName = 이름(명세의 "last" 는 순서가 아니라 family name). */
@@ -70,7 +74,7 @@ public class BackgroundCheckClient {
 
     public CreateOutcome create(CreateRequest request) {
         try {
-            return restClient.post().uri("/background-checks")
+            return postClient.post().uri("/background-checks")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .exchange((req, res) -> {
@@ -96,7 +100,7 @@ public class BackgroundCheckClient {
 
     public FetchOutcome fetch(String checkId) {
         try {
-            return restClient.get().uri("/background-checks/{checkId}", checkId)
+            return pollClient.get().uri("/background-checks/{checkId}", checkId)
                     .exchange((req, res) -> {
                         HttpStatusCode status = res.getStatusCode();
                         log.info("BG GET {} {}", checkId, status.value());
