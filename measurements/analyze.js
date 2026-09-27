@@ -161,6 +161,29 @@ h('4. E6 재시도 탐침 — 실패한 GET 을 대기 후 다시 보냈을 때 
   out.push(table(['대기(초)', '성공률 [95% CI]', 'n'], Object.entries(byDelay).sort((a, b) => a[0] - b[0]).map(([d, v]) => [d, ci(v.ok, v.n), v.n])))
 }
 
+// ---------- 4b. 실패 후 다음 시도까지의 간격별 성공률 (자연 발생 데이터) ----------
+h('4b. 실패 → 같은 checkId 다음 시도: 간격별 성공률 (전 실험 자연 발생분)')
+out.push('- E6 은 대기 단계별 n 이 작아, 모든 실험에서 "실패 후 같은 checkId 를 다시 조회한 경우" 를 간격(실패 응답 수신 → 다음 요청 시작)별로 나눈다.\n')
+{
+  const gapRows = []
+  const buckets = [[0, 2], [2, 10], [10, 30], [30, 120], [120, Infinity]]
+  const acc = buckets.map(() => ({ n: 0, ok: 0 }))
+  for (const c of Object.values(byCheck)) {
+    const rs = [...c].sort((a, b) => (a.ts < b.ts ? -1 : 1))
+    for (let i = 0; i + 1 < rs.length; i++) {
+      if (isOk(rs[i])) continue
+      const gap = (new Date(rs[i + 1].ts) - (new Date(rs[i].ts).getTime() + (rs[i].latencyMs ?? 0))) / 1000
+      const bi = buckets.findIndex(([lo, hi]) => gap >= lo && gap < hi)
+      if (bi < 0) continue
+      acc[bi].n++
+      if (isOk(rs[i + 1])) acc[bi].ok++
+    }
+  }
+  buckets.forEach(([lo, hi], i) => gapRows.push([`${lo}–${hi === Infinity ? '' : hi}s`, ci(acc[i].ok, acc[i].n), acc[i].n]))
+  out.push(table(['실패 후 간격', '다음 시도 성공률 [95% CI]', 'n'], gapRows))
+  out.push(`\n(비교: 전체 시도 성공률 ${ci(allOk, allAttempts)}, n=${allAttempts})`)
+}
+
 // ---------- 5. Retry-After ----------
 h('5. 503 의 Retry-After — 헤더 vs 본문')
 {
@@ -258,6 +281,47 @@ h('7. pending → 최종 상태 소요 시간 (E1)')
   const polls = pend.reduce((s, t) => s + t.polls, 0)
   const pollErr = pend.reduce((s, t) => s + t.pollErrors, 0)
   out.push(`\n폴링 GET 실패: ${ci(pollErr, polls)} (n=${polls})`)
+}
+
+// ---------- 7b. 폴링 간격 시뮬레이션 (E1 완료 시간 × GET 원자료) ----------
+h('7b. 폴링 간격별 결과 확인 지연과 호출 수 (시뮬레이션)')
+out.push('- 완료 시각: E1 pending 건의 서버 기준 소요 시간(completedAt − createdAt)에서 무작위 추출. 폴링 결과: 60s 구간 GET 상세 원자료에서 무작위 추출(시도당 타임아웃 31s).')
+out.push('- 첫 폴링 25초 뒤, 이후 고정 간격. 폴링 응답이 성공이고 그 시점이 완료 이후면 확인. 최대 5분. 20,000회, 시드 고정.')
+out.push('- ⚠️ 완료 시간 표본이 n=18 로 작다. 분포의 꼬리(최댓값 부근)는 불확실하다.\n')
+{
+  let tracks = []
+  try {
+    tracks = JSON.parse(readFileSync(fileURLToPath(new URL(`./results/${runId}-e1-tracks.json`, import.meta.url)), 'utf8'))
+  } catch {}
+  const comp = tracks.filter((t) => t.postBodyStatus === 'pending' && t.serverCompletedAt).map((t) => new Date(t.serverCompletedAt) - new Date(t.serverCreatedAt))
+  const pool = g60.map((r) => ({ lat: Math.min(r.errorClass === 'timeout' ? r.timeoutMs : r.latencyMs, 31_000), ok: r.httpStatus === 200 }))
+  let seed = 7
+  const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
+  const rows = []
+  if (comp.length && pool.length)
+    for (const I of [5_000, 10_000, 20_000, 30_000]) {
+      const delays = []
+      let calls = 0
+      let giveUp = 0
+      const N = 20_000
+      for (let k = 0; k < N; k++) {
+        const done = comp[Math.floor(rand() * comp.length)]
+        let t = 25_000
+        let seen = null
+        while (t <= 300_000) {
+          const a = pool[Math.floor(rand() * pool.length)]
+          calls++
+          const respAt = t + a.lat
+          if (a.ok && t >= done) { seen = respAt; break }
+          t = Math.max(t + I, respAt) // 응답을 받은 뒤 다음 폴링 (간격보다 빨리 보내지 않음)
+        }
+        if (seen === null) giveUp++
+        else delays.push(seen - done)
+      }
+      delays.sort((a, b) => a - b)
+      rows.push([`${I / 1000}s`, ms(percentile(delays, 50)), ms(percentile(delays, 95)), (calls / N).toFixed(1), pct(giveUp / N)])
+    }
+  out.push(table(['폴링 간격', '완료→확인 지연 p50', '완료→확인 지연 p95', '건당 평균 GET 수', '5분 안에 확인 못 함'], rows))
 }
 
 // ---------- 8. E3 같은 employeeId POST 반복 ----------
