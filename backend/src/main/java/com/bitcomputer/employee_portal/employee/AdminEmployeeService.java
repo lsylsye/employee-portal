@@ -21,8 +21,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -35,6 +37,7 @@ public class AdminEmployeeService {
     private final PasswordEncoder passwordEncoder;
     private final TemporaryPasswordGenerator temporaryPasswordGenerator;
     private final FindByIndexNameSessionRepository<? extends Session> sessionRepository;
+    private final EmployeeChangeRecorder changeRecorder;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -65,10 +68,13 @@ public class AdminEmployeeService {
         return new Created(detail(employee, account.getLoginId()), account.getLoginId(), temporaryPassword);
     }
 
-    public Detail update(String employeeNo, UpdateRequest request) {
+    public Detail update(String employeeNo, UpdateRequest request, String actorLoginId) {
         validateBirthDate(request.birthDate());
         Employee employee = find(employeeNo);
-        employee.updateByAdmin(request.lastName(), request.firstName(), request.birthDate(), request.contact(), clock.instant());
+        Instant now = clock.instant();
+        Set<String> changed = employee.updateByAdmin(
+                request.lastName(), request.firstName(), request.birthDate(), request.contact(), now);
+        changeRecorder.record(employee, actorLoginId, changed, now);
         return detail(employee);
     }
 
@@ -76,11 +82,12 @@ public class AdminEmployeeService {
      * 퇴사 처리. 차단일이 오늘(KST) 이하면 그 직원의 세션 행을 바로 지운다.
      * 미래 날짜(예약)는 지우지 않는다. 그날이 되면 AccessBlockFilter 가 다음 요청에서 막고 세션을 지운다.
      */
-    public Detail blockAccess(String employeeNo, AccessBlockRequest request) {
+    public Detail blockAccess(String employeeNo, AccessBlockRequest request, String actorLoginId) {
         LocalDate today = today();
         LocalDate blockedOn = request == null || request.blockedOn() == null ? today : request.blockedOn();
         Employee employee = find(employeeNo);
-        employee.blockAccessFrom(blockedOn, clock.instant());
+        Instant now = clock.instant();
+        changeRecorder.record(employee, actorLoginId, employee.blockAccessFrom(blockedOn, now), now);
 
         if (employee.isAccessBlockedOn(today)) {
             accountRepository.findByEmployeeId(employee.getId())
@@ -91,9 +98,10 @@ public class AdminEmployeeService {
     }
 
     /** 차단 취소(오입력 정정). 이미 파기된 BG 결과는 돌아오지 않는다. */
-    public Detail cancelAccessBlock(String employeeNo) {
+    public Detail cancelAccessBlock(String employeeNo, String actorLoginId) {
         Employee employee = find(employeeNo);
-        employee.cancelAccessBlock(clock.instant());
+        Instant now = clock.instant();
+        changeRecorder.record(employee, actorLoginId, employee.cancelAccessBlock(now), now);
         log.info("차단 취소: {}", employeeNo);
         return detail(employee);
     }
