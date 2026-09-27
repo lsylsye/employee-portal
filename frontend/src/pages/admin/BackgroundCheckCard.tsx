@@ -12,7 +12,7 @@ import { useLoad } from '@/lib/useLoad'
 import { useSubmit } from '@/lib/useSubmit'
 
 /**
- * 화면이 우리 서버를 다시 읽는 주기. 외부 API 폴링은 백엔드가 따로 하고(Retry-After 따름),
+ * 화면이 우리 서버를 다시 읽는 주기. 외부 API 폴링은 백엔드가 따로 하고(10초 간격, Retry-After 는 따르지 않음),
  * 화면은 우리 DB 에 저장된 상태만 읽으므로 외부 호출이 늘지 않는다.
  */
 const SCREEN_REFRESH_MS = 3000
@@ -22,7 +22,7 @@ export function BackgroundCheckCard({ employee }: { employee: EmployeeDetail }) 
   const { employeeNo } = employee
   const { data: checks, error, loading, reload } = useLoad(() => api.listBackgroundChecks(employeeNo), employeeNo)
 
-  const hasPending = checks?.some((c) => c.status === 'pending') ?? false
+  const hasPending = checks?.some((c) => c.status === 'PENDING') ?? false
 
   // 진행 중인 조회가 있으면 끝날 때까지 주기적으로 다시 읽는다
   useEffect(() => {
@@ -33,7 +33,8 @@ export function BackgroundCheckCard({ employee }: { employee: EmployeeDetail }) 
 
   useNotifyWhenSettled(checks)
 
-  // 실행할 수 없는 이유. 버튼을 막고 이유를 보여 준다
+  // 실행할 수 없는 이유. 버튼을 막고 이유를 보여 준다.
+  // 결과 미확인(UNRESOLVED)·요청 실패(FAILED) 뒤에는 다시 요청할 수 있다. 진행 중(PENDING)일 때만 막는다
   const blockedReason =
     employee.status === 'BLOCKED'
       ? '퇴사한 직원은 신원 조회를 할 수 없어요.'
@@ -53,7 +54,7 @@ export function BackgroundCheckCard({ employee }: { employee: EmployeeDetail }) 
     <Card>
       <CardHeader>
         <CardTitle>신원 조회</CardTitle>
-        <CardDescription>목록에는 판정만 보여요. 상세 결과는 열 때마다 열람 기록이 남아요.</CardDescription>
+        <CardDescription>목록에는 판정만 보여요. 상세 결과는 '결과 보기'를 눌렀을 때만 불러와요.</CardDescription>
         <CardAction>
           <ConfirmDialog
             trigger={
@@ -114,9 +115,10 @@ function useNotifyWhenSettled(checks: BgCheckSummary[] | null) {
   useEffect(() => {
     if (!checks) return
     for (const c of checks) {
-      if (c.status === 'pending') pendingIds.current.add(c.id)
+      if (c.status === 'PENDING') pendingIds.current.add(c.id)
       else if (pendingIds.current.delete(c.id)) {
-        if (c.status === 'needs_attention') toast.error('신원 조회 결과를 받지 못했어요. 잠시 후 다시 요청해 주세요.')
+        if (c.status === 'UNRESOLVED') toast.error('신원 조회 결과를 확인하지 못했어요. 다시 요청할 수 있어요.')
+        else if (c.status === 'FAILED') toast.error('외부 조회 서비스가 요청을 받지 않았어요. 다시 요청할 수 있어요.')
         else toast.success('신원 조회 결과가 나왔어요.')
       }
     }
@@ -126,7 +128,8 @@ function useNotifyWhenSettled(checks: BgCheckSummary[] | null) {
 function BgRow({ check }: { check: BgCheckSummary }) {
   const [detail, setDetail] = useState<BgCheckDetail | null>(null)
   const { error, submitting, submit } = useSubmit()
-  const final = check.status === 'clear' || check.status === 'flagged'
+  // 결과 보기는 판정이 있는 CLEAR·FLAGGED 에서만. UNRESOLVED·FAILED 는 결과가 없다
+  const final = check.status === 'CLEAR' || check.status === 'FLAGGED'
   const open = detail !== null || error !== null
 
   function toggle() {
@@ -151,10 +154,13 @@ function BgRow({ check }: { check: BgCheckSummary }) {
           )}
         </TableCell>
       </TableRow>
-      {check.status === 'needs_attention' && (
+      {(check.status === 'UNRESOLVED' || check.status === 'FAILED') && (
         <TableRow className="hover:bg-transparent">
           <TableCell colSpan={4} className="whitespace-normal">
-            <InlineError>외부 서비스에서 결과를 받지 못해 추적을 멈췄어요. 잠시 후 다시 요청해 주세요.</InlineError>
+            <InlineError>
+              {FAILURE_GUIDE[check.status]}
+              {check.failureReason && <span className="ml-1 font-mono text-xs">(사유: {check.failureReason})</span>}
+            </InlineError>
           </TableCell>
         </TableRow>
       )}
@@ -180,6 +186,13 @@ function BgRow({ check }: { check: BgCheckSummary }) {
     </Fragment>
   )
 }
+
+/** 관리자에게 보여 줄 다음 행동. 결과 미확인은 외부에 요청이 접수됐을 수 있다 */
+const FAILURE_GUIDE = {
+  UNRESOLVED:
+    '외부 서비스에서 결과를 확인하지 못했어요. 요청이 접수됐는지는 외부 목록 조회로 확인할 수 있어요. 다시 요청할 수 있어요.',
+  FAILED: '외부 조회 서비스가 요청을 받지 않았어요. 성명·생년월일을 확인한 뒤 다시 요청해 주세요.',
+} as const
 
 function yesNo(value: boolean | null, yes: string, no: string): string {
   if (value === null) return '-'

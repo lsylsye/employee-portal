@@ -1,10 +1,12 @@
 package com.bitcomputer.employee_portal.employee;
 
+import com.bitcomputer.employee_portal.backgroundcheck.BackgroundCheckStatus;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 /** 관리자 직원 API 의 요청·응답 */
@@ -16,11 +18,18 @@ public final class AdminEmployeeDto {
     /** 이름에는 공백을 허용하지 않는다(성명 = 성 + 이름으로 합치기 때문). */
     static final String NO_WHITESPACE = "\\S+";
 
-    /** 목록. 동명이인(EMP-001/002)을 구분할 수 있게 사번·생년월일을 함께 준다. */
+    /**
+     * 목록. 동명이인(EMP-001/002)을 구분할 수 있게 사번·생년월일을 함께 준다.
+     * latestCheckStatus 는 판정만(상세 결과는 주지 않는다). 조회가 없거나 보관 기간이 지났으면 null.
+     */
     public record Summary(String employeeNo, String fullName, LocalDate birthDate,
-                          EmploymentStatus status, LocalDate accessBlockedOn) {
-        static Summary of(Employee e, LocalDate today) {
-            return new Summary(e.getEmployeeNo(), e.getFullName(), e.getBirthDate(), e.statusOn(today), e.getAccessBlockedOn());
+                          EmploymentStatus status, LocalDate accessBlockedOn,
+                          BackgroundCheckStatus latestCheckStatus, Instant latestCheckRequestedAt) {
+        static Summary of(EmployeeListRow row, LocalDate today) {
+            return new Summary(row.getEmployeeNo(), row.getFullName(), row.getBirthDate(),
+                    EmploymentStatus.of(row.getAccessBlockedOn(), today), row.getAccessBlockedOn(),
+                    row.getLatestCheckStatus() == null ? null : BackgroundCheckStatus.valueOf(row.getLatestCheckStatus()),
+                    row.getLatestCheckRequestedAt());
         }
     }
 

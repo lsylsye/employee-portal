@@ -15,8 +15,6 @@ export function EmployeeListPage() {
   const { data: employees, error, loading } = useLoad(() => api.listEmployees())
   const [query, setQuery] = useState('')
 
-  // 최근 BG 판정은 feat/background-check 전에는 응답에 없다. 없으면 열을 숨긴다
-  const hasBg = employees?.some((e) => e.latestBgStatus !== undefined) ?? false
   const q = query.trim()
   const rows = employees && q ? employees.filter((e) => e.fullName.includes(q) || e.employeeNo.includes(q.toUpperCase())) : employees
 
@@ -57,7 +55,7 @@ export function EmployeeListPage() {
                   <TableHead>생년월일</TableHead>
                   <TableHead>재직 상태</TableHead>
                   <TableHead>접근 차단일</TableHead>
-                  {hasBg && <TableHead>최근 신원 조회</TableHead>}
+                  <TableHead>최근 신원 조회</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -75,11 +73,10 @@ export function EmployeeListPage() {
                       <EmploymentBadge status={e.status} />
                     </TableCell>
                     <TableCell className="text-muted-foreground">{e.accessBlockedOn ?? '-'}</TableCell>
-                    {hasBg && (
-                      <TableCell>
-                        <BgBadge status={e.latestBgStatus ?? null} />
-                      </TableCell>
-                    )}
+                    {/* 판정만(판단 3). 조회가 없거나 보관 기간이 지났으면 null → "조회 안 함" */}
+                    <TableCell>
+                      <BgBadge status={e.latestCheckStatus} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

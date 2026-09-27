@@ -1,7 +1,7 @@
 import { Loader2, Pencil } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { toast } from 'sonner'
-import { api, type ContactFields, type MyProfile, type UpdateMyProfileRequest } from '@/api'
+import { api, type ContactFields, type MyBackgroundCheck, type MyProfile, type UpdateMyProfileRequest } from '@/api'
 import { EmptyState, Field, InfoList, InlineError, Loading, PageHeader } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -44,6 +44,13 @@ export function MyProfilePage() {
   )
 }
 
+/** NOT_COMPLETED 는 판정을 드러내지 않는 문구로 보여 준다(결과 미확인·요청 실패를 묶은 값) */
+const PROGRESS_LABEL: Record<MyBackgroundCheck['progress'], string> = {
+  IN_PROGRESS: '진행 중',
+  COMPLETED: '완료',
+  NOT_COMPLETED: '완료되지 않음',
+}
+
 /** 판단 (3) b안: 조회 일자와 진행 상태만 보여 준다 */
 function MyBackgroundChecks() {
   const { data: checks, error, loading } = useLoad(() => api.listMyBackgroundChecks())
@@ -66,7 +73,7 @@ function MyBackgroundChecks() {
             {checks.map((c) => (
               <li key={c.requestedAt} className="flex justify-between py-2">
                 <span>{formatKst(c.requestedAt)}</span>
-                <span className="text-muted-foreground">{c.state === 'IN_PROGRESS' ? '진행 중' : '완료'}</span>
+                <span className="text-muted-foreground">{PROGRESS_LABEL[c.progress]}</span>
               </li>
             ))}
           </ul>
@@ -83,7 +90,7 @@ const CONTACT_LABELS: [keyof ContactFields, string][] = [
   ['emergencyContact', '비상연락처'],
 ]
 
-/** 연락처: 읽기 모드 ↔ 편집 모드. 즉시 반영, 승인·이력 없음 (판단 4) */
+/** 연락처: 읽기 모드 ↔ 편집 모드. 즉시 반영, 승인 없음. 서버는 바뀐 필드 이름만 기록한다(값은 남기지 않음, 판단 4) */
 function ContactCard({ profile, onSaved }: { profile: MyProfile; onSaved: (p: MyProfile) => void }) {
   const [editing, setEditing] = useState(false)
 

@@ -2,6 +2,7 @@
 // 상태는 sessionStorage 에 둬서 새로고침해도 유지되고, 탭을 닫으면 초기화된다.
 // 목 계정: admin / admin1234, 제출용 직원 EMP-003 / password. 시드 나머지 9명은 계정이 없다.
 // 새로 등록한 직원은 계정과 임시 비밀번호가 함께 생긴다.
+// 신원 조회 결과는 무작위(이상 없음 위주)이고, EMP-010 은 항상 결과 미확인(UNRESOLVED)으로 끝난다(빨간 배지 확인용).
 import { todayKst } from '../lib/date'
 import { type Api, ApiError, messageOf } from './api'
 import type {
@@ -11,6 +12,7 @@ import type {
   EmployeeDetail,
   EmployeeSummary,
   EmploymentStatus,
+  MyBackgroundCheck,
   MyProfile,
   SessionUser,
 } from './types'
@@ -25,7 +27,8 @@ type MockEmployee = ContactFields & {
 
 type MockAccount = { loginId: string; password: string; employeeNo: string | null }
 
-type MockBg = BgCheckDetail & { employeeNo: string; finalStatus: 'clear' | 'flagged' }
+type MockFinal = 'CLEAR' | 'FLAGGED' | 'UNRESOLVED'
+type MockBg = Omit<BgCheckDetail, 'fullName'> & { finalStatus: MockFinal }
 
 type MockDb = {
   employees: MockEmployee[]
@@ -36,7 +39,7 @@ type MockDb = {
   session: string | null // loginId
 }
 
-const STORAGE_KEY = 'mock-db-v2'
+const STORAGE_KEY = 'mock-db-v3'
 /** pending 이 최종 상태가 되기까지 걸리는 시간(목). 실측 p50 61s 는 시연에 길어서 줄였다 */
 const MOCK_PENDING_MS = 8000
 
@@ -71,24 +74,28 @@ function seed(): MockDb {
   ]
   const now = Date.now()
   const checks: MockBg[] = [
-    bg(1, 'EMP-001', 'clear', now - 3 * 86400_000, now - 3 * 86400_000 + 61_000),
-    bg(2, 'EMP-003', 'flagged', now - 86400_000, now - 86400_000 + 45_000),
+    bg(1, 'EMP-001', 'CLEAR', now - 3 * 86400_000, now - 3 * 86400_000 + 61_000),
+    bg(2, 'EMP-003', 'FLAGGED', now - 86400_000, now - 86400_000 + 45_000),
+    bg(3, 'EMP-002', 'UNRESOLVED', now - 2 * 86400_000, now - 2 * 86400_000 + 300_000),
   ]
-  return { employees, accounts, checks, nextEmployeeNo: 11, nextBgId: 3, session: null }
+  return { employees, accounts, checks, nextEmployeeNo: 11, nextBgId: 4, session: null }
 }
 
-function bg(id: number, employeeNo: string, finalStatus: 'clear' | 'flagged', requested: number, completed: number | null): MockBg {
+function bg(id: number, employeeNo: string, finalStatus: MockFinal, requested: number, completed: number | null): MockBg {
   const done = completed !== null
+  // 결과 필드는 판정(CLEAR/FLAGGED)이 났을 때만 채운다(서버와 같음)
+  const judged = done && finalStatus !== 'UNRESOLVED'
   return {
     id,
     employeeNo,
     finalStatus,
     requestedAt: new Date(requested).toISOString(),
-    completedAt: done ? new Date(completed).toISOString() : null,
-    status: done ? finalStatus : 'pending',
-    criminalRecord: done ? finalStatus === 'flagged' : null,
-    educationVerified: done ? true : null,
-    employmentVerified: done ? finalStatus === 'clear' : null,
+    completedAt: judged ? new Date(completed).toISOString() : null,
+    status: done ? finalStatus : 'PENDING',
+    failureReason: done && finalStatus === 'UNRESOLVED' ? 'POLL_TIMEOUT' : null,
+    criminalRecord: judged ? finalStatus === 'FLAGGED' : null,
+    educationVerified: judged ? true : null,
+    employmentVerified: judged ? finalStatus === 'CLEAR' : null,
   }
 }
 
@@ -144,7 +151,7 @@ function statusOf(e: MockEmployee): EmploymentStatus {
 
 /** pending 이 충분히 지났으면 최종 상태로 바꾼다(백엔드 폴링 흉내) */
 function settle(c: MockBg) {
-  if (c.status !== 'pending') return
+  if (c.status !== 'PENDING') return
   const requested = Date.parse(c.requestedAt)
   if (Date.now() - requested < MOCK_PENDING_MS) return
   Object.assign(c, bg(c.id, c.employeeNo, c.finalStatus, requested, requested + MOCK_PENDING_MS))
@@ -161,20 +168,24 @@ function contact(e: MockEmployee): ContactFields {
   return { phone: e.phone, email: e.email, address: e.address, emergencyContact: e.emergencyContact }
 }
 
-function toSummary(e: MockEmployee): EmployeeSummary {
+function base(e: MockEmployee) {
   return {
     employeeNo: e.employeeNo,
     fullName: e.lastName + e.firstName,
     birthDate: e.birthDate,
     status: statusOf(e),
     accessBlockedOn: e.accessBlockedOn,
-    latestBgStatus: checksOf(e.employeeNo)[0]?.status ?? null,
   }
+}
+
+function toSummary(e: MockEmployee): EmployeeSummary {
+  const latest = checksOf(e.employeeNo)[0]
+  return { ...base(e), latestCheckStatus: latest?.status ?? null, latestCheckRequestedAt: latest?.requestedAt ?? null }
 }
 
 function toDetail(e: MockEmployee): EmployeeDetail {
   const account = data().accounts.find((a) => a.employeeNo === e.employeeNo)
-  return { ...toSummary(e), ...contact(e), lastName: e.lastName, firstName: e.firstName, loginId: account?.loginId ?? null }
+  return { ...base(e), ...contact(e), lastName: e.lastName, firstName: e.firstName, loginId: account?.loginId ?? null }
 }
 
 function toProfile(e: MockEmployee): MyProfile {
@@ -182,7 +193,7 @@ function toProfile(e: MockEmployee): MyProfile {
 }
 
 function toBgSummary(c: MockBg): BgCheckSummary {
-  return { id: c.id, requestedAt: c.requestedAt, status: c.status, completedAt: c.completedAt }
+  return { id: c.id, requestedAt: c.requestedAt, status: c.status, completedAt: c.completedAt, failureReason: c.failureReason }
 }
 
 function sessionUser(): SessionUser | null {
@@ -208,7 +219,7 @@ function requireRole(role: 'ADMIN' | 'EMPLOYEE'): SessionUser {
 
 function findEmployee(employeeNo: string): MockEmployee {
   const e = data().employees.find((x) => x.employeeNo === employeeNo)
-  if (!e) fail(404, 'NOT_FOUND', '직원을 찾을 수 없어요.')
+  if (!e) fail(404, 'EMPLOYEE_NOT_FOUND')
   return e
 }
 
@@ -253,10 +264,12 @@ export const mockApi: Api = {
     }),
   listMyBackgroundChecks: () =>
     delay(() =>
-      checksOf(requireRole('EMPLOYEE').employeeNo!).map((c) => ({
-        requestedAt: c.requestedAt,
-        state: c.status === 'pending' ? ('IN_PROGRESS' as const) : ('DONE' as const),
-      })),
+      checksOf(requireRole('EMPLOYEE').employeeNo!).map(
+        (c): MyBackgroundCheck => ({
+          requestedAt: c.requestedAt,
+          progress: c.status === 'PENDING' ? 'IN_PROGRESS' : c.status === 'CLEAR' || c.status === 'FLAGGED' ? 'COMPLETED' : 'NOT_COMPLETED',
+        }),
+      ),
     ),
 
   listEmployees: () =>
@@ -322,20 +335,25 @@ export const mockApi: Api = {
     delay(() => {
       requireRole('ADMIN')
       const e = findEmployee(no)
-      if (statusOf(e) === 'BLOCKED') fail(422, 'BG_BLOCKED_EMPLOYEE', '퇴사한 직원은 신원 조회를 할 수 없어요.')
-      if (!e.birthDate) fail(422, 'BG_BIRTH_DATE_MISSING', '생년월일이 확인되지 않아 신원 조회를 할 수 없어요.')
-      if (checksOf(no).some((c) => c.status === 'pending')) fail(409, 'BG_IN_PROGRESS', '진행 중인 조회가 있어요.')
+      // 서버와 같은 오류 코드(ErrorCode)
+      if (statusOf(e) === 'BLOCKED') fail(422, 'EMPLOYEE_ACCESS_BLOCKED')
+      if (!e.birthDate) fail(422, 'BIRTH_DATE_REQUIRED')
+      if (checksOf(no).some((c) => c.status === 'PENDING')) fail(409, 'BACKGROUND_CHECK_IN_PROGRESS')
       const db = data()
-      db.checks.push(bg(db.nextBgId++, no, Math.random() < 0.8 ? 'clear' : 'flagged', Date.now(), null))
+      const final: MockFinal = no === 'EMP-010' ? 'UNRESOLVED' : Math.random() < 0.8 ? 'CLEAR' : 'FLAGGED'
+      db.checks.push(bg(db.nextBgId++, no, final, Date.now(), null))
     }, 600),
   getBackgroundCheckDetail: (id) =>
     delay(() => {
       requireRole('ADMIN')
       const c = data().checks.find((x) => x.id === id)
-      if (!c) fail(404, 'NOT_FOUND', '조회 결과를 찾을 수 없어요.')
+      if (!c) fail(404, 'BACKGROUND_CHECK_NOT_FOUND')
       settle(c)
+      const e = findEmployee(c.employeeNo)
       return {
         ...toBgSummary(c),
+        employeeNo: c.employeeNo,
+        fullName: e.lastName + e.firstName,
         criminalRecord: c.criminalRecord,
         educationVerified: c.educationVerified,
         employmentVerified: c.employmentVerified,

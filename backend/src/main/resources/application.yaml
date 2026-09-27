@@ -41,3 +41,24 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+bg:
+  # 접근 차단일 + 이 기간이 지난 신원조회 결과는 조회 때 보여 주지 않는다(DECISIONS (3)).
+  # 회사 정책 값이다(법적 근거 미확인). 실제 삭제(스케줄러)는 범위 밖이다.
+  retention-after-block: 1y
+  # 주소는 비밀이 아니라 기본값을 둔다. 테스트는 닫힌 로컬 포트로 덮어쓴다(build.gradle).
+  base-url: ${BGCHECK_BASE_URL:https://54capvm12g.execute-api.ap-northeast-2.amazonaws.com}
+  # 후보자 키. 기본값 없음(누락 시 기동 실패). 로그·응답에 남기지 않는다.
+  api-key: ${BGCHECK_API_KEY}
+  # 타임아웃·폴링 값의 근거는 MEASUREMENTS.md §7 (실측 run1, n=2,731).
+  connect-timeout: 5s        # 연결 수립. 실측 대상이 아니라 POST 타임아웃 이하로 둔다
+  post-timeout: 5s           # §7-1: POST 관측 최댓값 1.54s. 재시도 없음(멱등하지 않음)
+  poll-timeout: 31s          # §7-1: 모든 응답이 30.18s 안에 끝남(서버 상한 약 30s)
+  polling:
+    enabled: true
+    first-delay: 25s         # §7-3: 서버 기준 최소 소요 26.15s
+    interval: 10s            # §7-3: 호출 수와 확인 지연의 절충. Retry-After 는 따르지 않음(§7-5)
+    max-wait: 5m             # §7-3: 넘으면 UNRESOLVED(결과 미확인)
+    # check_id 없이 이보다 오래된 PENDING 은 UNRESOLVED 로 복구한다(행 생성 직후 서버 중단 대비, 사용자 지정 규칙).
+    # POST 타임아웃이 5s 라 살아 있는 요청은 그 안에 끝난다. 여유를 두고 1분.
+    orphan-pending-after: 1m

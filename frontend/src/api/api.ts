@@ -67,6 +67,10 @@ const MESSAGES: Record<string, string> = {
   EMPLOYEE_NOT_FOUND: '직원을 찾을 수 없어요.',
   BIRTH_DATE_IN_FUTURE: '생년월일은 오늘 이후일 수 없어요.',
   CSRF_INVALID: '보안 토큰이 만료됐어요. 페이지를 새로고침해 주세요.',
+  BACKGROUND_CHECK_NOT_FOUND: '신원 조회 결과를 찾을 수 없어요.',
+  BACKGROUND_CHECK_IN_PROGRESS: '이미 진행 중인 신원 조회가 있어요. 끝나면 다시 요청해 주세요.',
+  BIRTH_DATE_REQUIRED: '생년월일이 확인되지 않아 신원 조회를 할 수 없어요. 신원 정보에서 생년월일을 먼저 입력해 주세요.',
+  EMPLOYEE_ACCESS_BLOCKED: '퇴사 처리된 직원은 신원 조회를 할 수 없어요.',
 }
 
 export function messageOf(code: string | null, serverMessage: string | undefined, status: number): string {

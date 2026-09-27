@@ -45,7 +45,7 @@
 |---|---|---|
 | GET | `/api/me/profile` | 내 인적사항 |
 | PATCH | `/api/me/profile` | 연락처, 이메일, 주소, 비상연락처만 수정. 성명·생년월일은 수정 불가(보내도 무시). 즉시 반영하고 바뀐 필드 이름만 기록(판단 4) |
-| GET | `/api/me/background-checks` | 조회 일자와 진행 상태만. 판정·상세 결과는 주지 않는다 |
+| GET | `/api/me/background-checks` | 조회 일자와 진행 상태(`IN_PROGRESS`/`COMPLETED`/`NOT_COMPLETED`)만. 판정·상세 결과는 주지 않는다 |
 
 ### 관리자: 직원 — `feat/admin-employee`
 | 메서드 | 경로 | 설명 |
@@ -60,9 +60,12 @@
 ### 관리자: Background Check — `feat/background-check`
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| POST | `/api/admin/employees/{employeeNo}/background-checks` | 실행. 202. 진행 중이면 409, 생년월일 없음·퇴사자면 422 |
-| GET | `/api/admin/employees/{employeeNo}/background-checks` | 이력. 판정만 |
-| GET | `/api/admin/background-checks/{id}` | 상세 결과. 열람 기록을 남기고 `Cache-Control: no-store` |
+| POST | `/api/admin/employees/{employeeNo}/background-checks` | 실행. 202(`PENDING`). 외부 POST 전에 PENDING 행을 먼저 만들어 중복 실행을 막는다. 진행 중이면 409, 생년월일 없음·퇴사자면 422. POST 가 4xx 면 `FAILED`, 타임아웃·5xx 면 `UNRESOLVED` |
+| GET | `/api/admin/employees/{employeeNo}/background-checks` | 이력(최신순). 판정만. 보관 기간이 지났으면 빈 목록 |
+| GET | `/api/admin/background-checks/{id}` | 상세 결과(범죄·학력·경력). `Cache-Control: no-store`. 저장된 결과만 읽고 외부 API 를 부르지 않는다. 보관 기간이 지났으면 404 |
+
+- 결과는 백그라운드 폴링이 채운다: 첫 폴링은 POST 후 25초, 간격 10초 고정, 5분이 지나면 `UNRESOLVED`. Retry-After 는 따르지 않는다. 값의 근거는 [MEASUREMENTS.md](MEASUREMENTS.md) §7.
+- MEASUREMENTS §7 의 "동기 GET(2초 × 최대 8회, 예산 10초)" 경로는 두지 않았다. 결과는 DB 에서만 읽고, 진행 중인 건은 폴링이 갱신한다.
 
 ### 기타
 | 메서드 | 경로 | 설명 |
@@ -77,12 +80,11 @@
 | 직원 : 계정 | 1 : 0..1 | `account.employee_id` NULL 허용 + UNIQUE(`account_employee_uk`) | `account_role_ck`: ADMIN 이면 `employee_id` NULL, EMPLOYEE 면 NOT NULL | RESTRICT |
 | 직원 : 변경 기록 | 1 : N | `employee_change_log.employee_id` NOT NULL | `field_name` 허용 목록 CHECK | RESTRICT |
 | 계정(수정한 사람) : 변경 기록 | 1 : N | `employee_change_log.changed_by` NOT NULL | — | RESTRICT |
-| 직원 : 신원조회 *(예정, `feat/background-check`)* | 1 : N | `background_check.employee_id` NOT NULL | 직원당 `PENDING` 하나(조건부 유니크) | RESTRICT |
-| 신원조회 열람 기록 *(예정)* | — | 직원·계정만 참조. **신원조회 행은 FK 로 참조하지 않는다** | 결과 값·checkId 없음 | — |
+| 직원 : 신원조회 | 1 : N | `background_check.employee_id` NOT NULL. 재조회 허용, 이전 결과는 이력 | 직원당 `PENDING` 하나(조건부 유니크), 최종 판정은 checkId·완료 시각 필수(CHECK) | RESTRICT |
+| 계정(실행한 관리자) : 신원조회 | 1 : N | `background_check.requested_by` NOT NULL | — | RESTRICT |
 | 계정 : 세션 | 1 : N (논리) | `spring_session.principal_name` = `login_id`. FK 아님(Spring Session 테이블) | — | 퇴사 처리 시 앱이 삭제 |
 
 - **삭제 정책은 RESTRICT.** 직원은 삭제하지 않는다(퇴사도 레코드를 보존하고 차단일만 둔다). 실수로 지우려 하면 DB 가 막는다.
-- 열람 기록이 신원조회 행을 FK 로 참조하지 않는 이유: 보관 기간이 지나면 신원조회 행을 파기(삭제)하는데, 감사 기록은 남아야 한다.
 - 접근 차단일은 계정이 아니라 **직원**에 둔다(퇴사는 인사상의 사실). 계정은 연결된 직원의 차단일로 판단하고, 연결이 없으면 ADMIN 만 통과한다(fail-closed).
 
 ### 다대다는 두지 않았다
@@ -95,11 +97,15 @@
   - 어긋남은 CHECK 제약 `employee_name_split_ck (full_name = last_name || first_name)` 으로 막는다. 앱도 성·이름을 고칠 때 성명을 다시 만든다.
 - 그 밖의 비정규화는 하지 않는다. 예: 관리자 목록의 "직원별 최신 신원조회 상태"를 직원 테이블에 복사하지 않고 조회 때 가져온다(아래).
 
-### 신원조회 테이블 설계 *(예정, `feat/background-check` 에서 구현)*
+### 신원조회 테이블
 - 인덱스
   - `(employee_id, requested_at DESC)`: 직원별 이력과 최신 1건
   - `status = 'PENDING'` 부분 인덱스: 백그라운드 폴링 대상 조회
   - `(employee_id) WHERE status = 'PENDING'` 조건부 유니크: 같은 직원에게 진행 중인 조회가 둘 생기지 않게 DB 에서 막는다(중복 실행 409)
+- 상태: `PENDING`(진행 중), `CLEAR`(이상 없음), `FLAGGED`(외부 판정 "검토 필요" — 사람이 볼 것),
+  `UNRESOLVED`(**결과 미확인** — 시스템이 결과를 모름, 빨간 배지), `FAILED`(POST 가 4xx 로 거절, 외부에 생성 안 됨)
+  - `UNRESOLVED` 가 되는 경우: POST 가 애매하게 실패(타임아웃·5xx), 폴링 한도 초과, checkId 없이 설정 시간 넘게 남은 PENDING(행 생성 직후 서버가 죽은 경우 — 폴링 작업이 복구)
+  - **`UNRESOLVED` 는 외부 API 의 `GET /background-checks?employeeId={사번}` 으로 실제 생성 여부를 확인할 수 있다.** 자동 확인 기능은 아직 없다(시간이 남으면 추가).
 - 관리자 목록의 최신 상태: N+1 없이 단일 쿼리(`DISTINCT ON (employee_id) ... ORDER BY employee_id, requested_at DESC`)로 가져온다. 쿼리 수가 1번인지 테스트로 확인한다.
 - 이 규모(직원 수십 명)에서는 비정규화 없이 조회로 충분하다.
 
@@ -125,5 +131,8 @@
 | BG 열람 권한 분리 | 관리자 전체가 열람한다. 관리자가 1명이라 분리해도 시연할 수 없다. |
 | 직원 본인의 BG 결과 열람 | 조회 사실만 보여 준다. 관리자 검토 전 공개와 정정 경로 부재 때문이다. 확장한다면 관리자 검토 후 공개. |
 | API 명세 yaml | 이 표와 로컬 Swagger(코드에서 자동 생성)로 대신한다. |
+| 신원조회 열람 기록 | 과제 요구는 열람 **통제**이고 관리자 권한으로 충족한다. 관리자가 여러 명이 되면 필요하다. |
+| 보관 기간 지난 신원조회 결과의 자동 삭제 | 조회할 때 보여 주지 않는 필터링까지만 한다. 기간이 지난 행은 DB 에 남는다. 실제 파기가 필요하면 스케줄러 삭제를 추가한다. |
+| UNRESOLVED 자동 확인 | 외부 목록 조회로 실제 생성 여부를 확인할 수 있지만 수동이다(시간이 남으면 추가). |
 | 변경 기록 조회 API·화면 | 변경 기록은 DB(`employee_change_log`)에만 남긴다. 분쟁·계정 탈취 확인 때 DB 에서 조회한다. |
 | 변경 전후 값 기록 | 누가·언제·어떤 필드만 남긴다. 과거 연락처·주소가 쌓이지 않게(최소 수집). 대신 탈취 후 원래 값으로 되돌릴 수는 없다. |
