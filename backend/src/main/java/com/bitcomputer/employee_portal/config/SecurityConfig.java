@@ -30,6 +30,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.CsrfLogoutHandler;
+import org.springframework.security.web.savedrequest.NullRequestCache;
 
 import java.time.Clock;
 import java.util.List;
@@ -40,6 +41,7 @@ import java.util.List;
  * - CSRF: SPA 방식(XSRF-TOKEN 쿠키 → X-XSRF-TOKEN 헤더). 로그인 요청에도 적용한다.
  * - 권한: /api/admin/** 는 ADMIN, 나머지 /api/** 는 로그인 필요. 화면(정적 파일)은 공개.
  * - 이미 로그인한 세션도 요청마다 차단 여부를 다시 본다(AccessBlockFilter).
+ * - 익명 요청은 세션을 만들지 않는다. 로그인 없이 요청만 반복해 spring_session 행을 쌓는 것을 막는다.
  */
 @Configuration
 public class SecurityConfig {
@@ -62,6 +64,9 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
+                // 기본 HttpSessionRequestCache 는 미인증 요청을 로그인 후 되돌아가려고 세션에 저장한다.
+                // 그 과정에서 익명 요청마다 세션(행)이 생긴다. SPA 라 되돌아갈 요청을 서버가 기억할 필요가 없다.
+                .requestCache(cache -> cache.requestCache(new NullRequestCache()))
                 .addFilterBefore(new AccessBlockFilter(accountRepository, clock), AuthorizationFilter.class)
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((request, response, ex) -> ErrorCode.UNAUTHENTICATED.write(response))

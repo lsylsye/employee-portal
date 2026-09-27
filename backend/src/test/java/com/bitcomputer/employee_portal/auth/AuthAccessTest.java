@@ -28,7 +28,6 @@ import java.time.LocalDate;
 import java.util.Base64;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,6 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * T1 접근 통제(인증·역할 부분) + T2 퇴사자 차단(KST 경계, 기존 세션 차단).
  * 직원 본인 API·관리자 API 케이스는 해당 브랜치에서 추가한다.
+ * CSRF 는 실제 흐름(GET /api/auth/csrf → X-XSRF-TOKEN 헤더)으로 보낸다. spring-security-test 의 csrf() 는
+ * CSRF 저장소를 세션 기반으로 바꿔 끼워서, 운영에는 없는 익명 세션을 만든다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -175,7 +176,10 @@ class AuthAccessTest {
     void 로그아웃하면_세션이_끊긴다() throws Exception {
         Cookie session = login(EMPLOYEE_ID, PASSWORD);
 
-        mockMvc.perform(post("/api/auth/logout").cookie(session).with(csrf())).andExpect(status().isNoContent());
+        // 로그인하면 CSRF 토큰이 교체되므로 새로 받는다.
+        Cookie xsrf = xsrf(session);
+        mockMvc.perform(post("/api/auth/logout").cookie(session, xsrf).header("X-XSRF-TOKEN", xsrf.getValue()))
+                .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/auth/me").cookie(session)).andExpect(status().isUnauthorized());
     }
 
@@ -189,8 +193,20 @@ class AuthAccessTest {
     }
 
     private ResultActions loginRaw(String loginId, String password) throws Exception {
-        return mockMvc.perform(post("/api/auth/login").with(csrf())
+        Cookie xsrf = xsrf(null);
+        return mockMvc.perform(post("/api/auth/login").cookie(xsrf).header("X-XSRF-TOKEN", xsrf.getValue())
                 .contentType(MediaType.APPLICATION_JSON).content(body(loginId, password)));
+    }
+
+    /** 프론트와 같은 방식으로 CSRF 쿠키를 받는다. */
+    private Cookie xsrf(Cookie session) throws Exception {
+        var request = get("/api/auth/csrf");
+        if (session != null) {
+            request.cookie(session);
+        }
+        Cookie xsrf = mockMvc.perform(request).andReturn().getResponse().getCookie("XSRF-TOKEN");
+        assertThat(xsrf).isNotNull();
+        return xsrf;
     }
 
     /** Spring Session 쿠키 값은 세션 ID 의 Base64 인코딩이다. */
