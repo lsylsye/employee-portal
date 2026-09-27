@@ -1,0 +1,189 @@
+// 실측 원자료(raw/<runId>-*.ndjson) → MEASUREMENTS.md 에 옮길 표(마크다운).
+// 원칙: MEASUREMENTS 의 모든 수치는 이 스크립트가 계산한다(손계산 금지). 모든 수치에 n 을 붙인다.
+// 실행: RUN_ID=<id> node measurements/analyze.js   → stdout + results/<runId>.md
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { LEGACY_TIMEOUT_MS, RAW_DIR, runIdFromEnv } from './lib/client.js'
+
+const runId = runIdFromEnv()
+const PERSISTENT_MIN_ATTEMPTS = 3 // checkId 에 GET 3회 이상 시도했는데 성공 0 → "지속 실패" 로 분류
+const WARMUP = 5 // 실험별 첫 5건은 연결 수립 비용이 섞여 지연 통계에서 제외
+
+// ---------- 로드 ----------
+const recs = readdirSync(RAW_DIR)
+  .filter((f) => f.startsWith(`${runId}-`) && f.endsWith('.ndjson'))
+  .flatMap((f) => readFileSync(RAW_DIR + f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)))
+  .map((r) => ({ ...r, timeoutMs: r.timeoutMs ?? LEGACY_TIMEOUT_MS, outcome: r.errorClass ?? String(r.httpStatus) }))
+  .sort((a, b) => (a.ts < b.ts ? -1 : 1))
+
+const endpoint = (r) =>
+  r.method === 'POST' ? 'POST' : /^\/background-checks\/[^/?]+$/.test(r.path) ? 'GET 상세' : 'GET 목록'
+const checkIdOf = (r) => (endpoint(r) === 'GET 상세' ? r.path.split('/').pop() : null)
+
+// ---------- 통계 도구 ----------
+function percentile(sorted, p) {
+  if (!sorted.length) return null
+  const rank = Math.ceil((p / 100) * sorted.length) // nearest-rank
+  return sorted[Math.min(sorted.length, Math.max(1, rank)) - 1]
+}
+// Wilson score 95% 구간. (같은 checkId 반복 시도는 독립이 아니므로 구간이 실제보다 좁게 나올 수 있음)
+function wilson(k, n, z = 1.96) {
+  if (!n) return [null, null]
+  const p = k / n
+  const d = 1 + (z * z) / n
+  const c = p + (z * z) / (2 * n)
+  const m = z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))
+  return [(c - m) / d, (c + m) / d]
+}
+const pct = (x) => (x === null ? '-' : `${(x * 100).toFixed(1)}%`)
+const ci = (k, n) => {
+  const [lo, hi] = wilson(k, n)
+  return `${pct(n ? k / n : null)} [${pct(lo)}–${pct(hi)}]`
+}
+const ms = (x) => (x === null ? '-' : x >= 1000 ? `${(x / 1000).toFixed(2)}s` : `${Math.round(x)}ms`)
+const table = (head, rows) => [`| ${head.join(' | ')} |`, `|${head.map(() => '---').join('|')}|`, ...rows.map((r) => `| ${r.join(' | ')} |`)].join('\n')
+
+const out = []
+const h = (s) => out.push(`\n## ${s}\n`)
+out.push(`# 실측 분석 — runId \`${runId}\``, '', `생성: ${new Date().toISOString()} / 전체 요청 n=${recs.length}`)
+
+// ---------- 1. 상태코드 분포 (엔드포인트별) ----------
+h('1. HTTP 상태코드 분포 (엔드포인트별, E6 탐침 포함)')
+for (const ep of ['GET 상세', 'GET 목록', 'POST']) {
+  const rs = recs.filter((r) => endpoint(r) === ep)
+  if (!rs.length) continue
+  const by = {}
+  for (const r of rs) by[r.outcome] = (by[r.outcome] ?? 0) + 1
+  out.push(`**${ep}** (n=${rs.length})\n`)
+  out.push(table(['결과', '건수', '비율 [95% CI]'], Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, v, ci(v, rs.length)])))
+  out.push('')
+}
+
+// ---------- 2. 지연 (엔드포인트 × 측정 타임아웃 구간, 성공 요청만) ----------
+h('2. 응답 지연 — 성공 응답(2xx/4xx)만, 엔드포인트·측정 타임아웃 구간별')
+out.push(`- 5xx 는 빠르게 실패하는 경향이 있어 섞으면 지연이 과소평가되므로 제외하고 따로 본다. 실험별 첫 ${WARMUP}건 제외.`)
+out.push('- 30s 구간의 timeout 은 "30초 이상" 으로 잘린 값이라 백분위에 넣지 않고 건수만 표시한다.\n')
+const warm = new Set()
+{
+  const seen = {}
+  for (const r of recs) {
+    seen[r.exp] = (seen[r.exp] ?? 0) + 1
+    if (seen[r.exp] <= WARMUP) warm.add(r)
+  }
+}
+const latRows = []
+for (const ep of ['GET 상세', 'GET 목록', 'POST'])
+  for (const t of [...new Set(recs.map((r) => r.timeoutMs))].sort()) {
+    const rs = recs.filter((r) => endpoint(r) === ep && r.timeoutMs === t && !warm.has(r))
+    const ok = rs.filter((r) => r.httpStatus && r.httpStatus < 500).map((r) => r.latencyMs).sort((a, b) => a - b)
+    const err5 = rs.filter((r) => r.httpStatus >= 500).map((r) => r.latencyMs).sort((a, b) => a - b)
+    const timeouts = rs.filter((r) => r.errorClass === 'timeout').length
+    if (!rs.length) continue
+    latRows.push([ep, `${t / 1000}s`, ok.length, ms(percentile(ok, 50)), ms(percentile(ok, 95)), ms(percentile(ok, 99)), ms(ok.at(-1) ?? null), timeouts, `${err5.length} (p50 ${ms(percentile(err5, 50))})`])
+  }
+out.push(table(['엔드포인트', '측정 타임아웃', '성공 n', 'p50', 'p95', 'p99', '최댓값', 'timeout 건수', '5xx n (지연 p50)'], latRows))
+
+// ---------- 3. checkId 별 분해: 일시적 실패 vs 지속 실패 ----------
+h('3. GET 상세 — checkId 별 분해 (일시적 실패 vs 지속 실패)')
+out.push(`- 지속 실패 checkId: GET ${PERSISTENT_MIN_ATTEMPTS}회 이상 시도, 성공(200/404) 0회. 404 는 "없음" 이라는 확정 응답이라 성공으로 친다.`)
+out.push('- ⚠️ 같은 checkId 의 반복 시도는 서로 독립이 아닐 수 있어 Wilson 구간은 실제보다 좁게 나올 수 있다.\n')
+// 우리가 POST 로 만든 checkId 만 대상 (E0 의 존재하지 않는/형식 오류 checkId 는 입력 검증 케이스라 제외)
+out.push('- 대상: 이 runId 에서 POST 로 생성한 checkId 만. E0 의 존재하지 않는 checkId 조회는 제외.\n')
+const createdIds = new Set(recs.filter((r) => r.method === 'POST' && r.checkId).map((r) => r.checkId))
+const byCheck = {}
+for (const r of recs.filter((r) => createdIds.has(checkIdOf(r)))) (byCheck[checkIdOf(r)] ??= []).push(r)
+const isOk = (r) => r.httpStatus === 200 || r.httpStatus === 404
+const checks = Object.entries(byCheck).map(([id, rs]) => ({ id, n: rs.length, ok: rs.filter(isOk).length, rs }))
+const eligible = checks.filter((c) => c.n >= PERSISTENT_MIN_ATTEMPTS)
+const persistent = eligible.filter((c) => c.ok === 0)
+const transientChecks = checks.filter((c) => c.ok > 0)
+const tAttempts = transientChecks.reduce((s, c) => s + c.n, 0)
+const tOk = transientChecks.reduce((s, c) => s + c.ok, 0)
+const allAttempts = checks.reduce((s, c) => s + c.n, 0)
+const allOk = checks.reduce((s, c) => s + c.ok, 0)
+// 재시도 관점: 실패 직후 "같은 checkId 의 다음 시도" 가 성공했는가 (지속 실패 checkId 제외)
+let nextN = 0
+let nextOk = 0
+for (const c of transientChecks)
+  for (let i = 0; i + 1 < c.rs.length; i++)
+    if (!isOk(c.rs[i])) {
+      nextN++
+      if (isOk(c.rs[i + 1])) nextOk++
+    }
+out.push(
+  table(
+    ['지표', '값 [95% CI]', 'n'],
+    [
+      ['전체 시도 성공률 (섞인 값)', ci(allOk, allAttempts), `시도 ${allAttempts} / checkId ${checks.length}`],
+      [`지속 실패 checkId 비율 (${PERSISTENT_MIN_ATTEMPTS}회+ 시도한 checkId 중)`, ci(persistent.length, eligible.length), `checkId ${eligible.length}`],
+      ['일시적 실패만의 시도 성공률 (한 번이라도 성공한 checkId)', ci(tOk, tAttempts), `시도 ${tAttempts} / checkId ${transientChecks.length}`],
+      ['실패 직후 다음 시도 성공률 (같은 checkId)', ci(nextOk, nextN), `실패 ${nextN}`],
+    ],
+  ),
+)
+if (persistent.length) {
+  // 지속 실패 checkId 를 만든 POST 입력
+  const postByCheck = Object.fromEntries(recs.filter((r) => r.method === 'POST' && r.checkId).map((r) => [r.checkId, r]))
+  out.push('\n지속 실패 checkId:\n')
+  out.push(
+    table(
+      ['checkId', '시도', '결과 순서', '생성 입력 (exp / case / employeeId)'],
+      persistent.map((c) => {
+        const p = postByCheck[c.id]
+        return [c.id, c.n, c.rs.map((r) => r.outcome).join(','), p ? `${p.exp} / ${p.case ?? p.phase ?? '-'} / ${p.employeeId}` : '-']
+      }),
+    ),
+  )
+}
+out.push('\n연속 실패 N회 확률 (독립 가정, 계산값):\n')
+{
+  const pFailAll = allAttempts ? 1 - allOk / allAttempts : null
+  const pFailT = tAttempts ? 1 - tOk / tAttempts : null
+  out.push(
+    table(
+      ['N', '섞인 실패율 기준', '일시적 실패율 기준'],
+      [1, 2, 3, 5, 8].map((N) => [N, pct(pFailAll === null ? null : pFailAll ** N), pct(pFailT === null ? null : pFailT ** N)]),
+    ),
+  )
+  out.push(`\n(섞인 실패율 ${pct(pFailAll)}, 일시적 실패율 ${pct(pFailT)} — 지속 실패 checkId 에는 횟수를 늘려도 효과가 없다)`)
+}
+
+// ---------- 4. E6 재시도 탐침: 대기 시간별 성공률 ----------
+h('4. E6 재시도 탐침 — 실패한 GET 을 대기 후 다시 보냈을 때 성공률')
+{
+  const probes = recs.filter((r) => r.exp === 'e6')
+  const byDelay = {}
+  for (const r of probes) {
+    const k = r.probeDelaySec
+    ;(byDelay[k] ??= { n: 0, ok: 0 }).n++
+    if (isOk(r)) byDelay[k].ok++
+  }
+  out.push(table(['대기(초)', '성공률 [95% CI]', 'n'], Object.entries(byDelay).sort((a, b) => a[0] - b[0]).map(([d, v]) => [d, ci(v.ok, v.n), v.n])))
+}
+
+// ---------- 5. Retry-After ----------
+h('5. 503 의 Retry-After — 헤더 vs 본문')
+{
+  const r503 = recs.filter((r) => r.httpStatus === 503)
+  const hdr = r503.filter((r) => r.retryAfterHeader !== null && r.retryAfterHeader !== undefined)
+  const body = r503.filter((r) => r.retryAfterBody !== undefined && r.retryAfterBody !== null)
+  const vals = [...new Set(r503.map((r) => `${r.retryAfterHeader ?? '-'}/${r.retryAfterBody ?? '-'}`))]
+  out.push(table(['지표', '값', 'n'], [['헤더 Retry-After 있음', ci(hdr.length, r503.length), r503.length], ['본문 retryAfter 있음', ci(body.length, r503.length), r503.length], ['관측된 값(헤더/본문)', vals.join(', '), r503.length]]))
+}
+
+// ---------- 6. POST 즉시 완료 / estimatedCompletionSeconds ----------
+h('6. POST 응답 상태 (201 중 즉시 완료 비율)')
+{
+  const p201 = recs.filter((r) => r.method === 'POST' && r.httpStatus === 201)
+  const by = {}
+  for (const r of p201) by[r.bodyStatus] = (by[r.bodyStatus] ?? 0) + 1
+  out.push(table(['POST 응답 status', '건수', '비율 [95% CI]'], Object.entries(by).map(([k, v]) => [k, v, ci(v, p201.length)])))
+  const est = p201.filter((r) => r.estimatedCompletionSeconds !== undefined)
+  out.push(`\nestimatedCompletionSeconds 가 있는 201: ${est.length}/${p201.length}, 값: ${[...new Set(est.map((r) => r.estimatedCompletionSeconds))].join(', ') || '-'}`)
+}
+
+const text = out.join('\n')
+console.log(text)
+const dir = fileURLToPath(new URL('./results/', import.meta.url))
+mkdirSync(dir, { recursive: true })
+writeFileSync(`${dir}${runId}.md`, text + '\n')
