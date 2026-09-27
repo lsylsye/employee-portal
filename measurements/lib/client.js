@@ -10,7 +10,7 @@ import { loadApiKey } from './env.js'
 export const BASE_URL = 'https://54capvm12g.execute-api.ap-northeast-2.amazonaws.com'
 export const RAW_DIR = fileURLToPath(new URL('../raw/', import.meta.url))
 export const GLOBAL_CAP = 5000
-export const EXP_CAPS = { e0: 30, e1: 1500, e2: 1100, e3: 40, e4: 150, e5: 1100, e6: 200, e7: 750 }
+export const EXP_CAPS = { e0: 30, e1: 1500, e2: 1100, e3: 80, e4: 150, e5: 1100, e6: 200, e7: 750 }
 
 // 측정용으로 넉넉하게: 긴 꼬리 지연까지 관측하기 위함.
 // E0 에서 30초 타임아웃 2건, 404 응답도 8~30초가 관측되어 30s → 60s 로 늘렸다(30s 는 꼬리를 잘라버림).
