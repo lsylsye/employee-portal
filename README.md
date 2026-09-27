@@ -45,7 +45,7 @@
 |---|---|---|
 | GET | `/api/me/profile` | 내 인적사항 |
 | PATCH | `/api/me/profile` | 연락처, 이메일, 주소, 비상연락처만 수정. 성명·생년월일은 수정 불가(보내도 무시). 즉시 반영하고 바뀐 필드 이름만 기록(판단 4) |
-| GET | `/api/me/background-checks` | 조회 일자와 진행 상태만. 판정·상세 결과는 주지 않는다 |
+| GET | `/api/me/background-checks` | 조회 일자와 진행 상태(`IN_PROGRESS`/`COMPLETED`/`NOT_COMPLETED`)만. 판정·상세 결과는 주지 않는다 |
 
 ### 관리자: 직원 — `feat/admin-employee`
 | 메서드 | 경로 | 설명 |
@@ -60,9 +60,12 @@
 ### 관리자: Background Check — `feat/background-check`
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| POST | `/api/admin/employees/{employeeNo}/background-checks` | 실행. 202. 진행 중이면 409, 생년월일 없음·퇴사자면 422 |
-| GET | `/api/admin/employees/{employeeNo}/background-checks` | 이력. 판정만 |
-| GET | `/api/admin/background-checks/{id}` | 상세 결과. `Cache-Control: no-store`. 보관 기간(차단일 + 설정값)이 지난 결과는 보여 주지 않는다 |
+| POST | `/api/admin/employees/{employeeNo}/background-checks` | 실행. 202(`PENDING`). 외부 POST 전에 PENDING 행을 먼저 만들어 중복 실행을 막는다. 진행 중이면 409, 생년월일 없음·퇴사자면 422. POST 가 4xx 면 `FAILED`, 타임아웃·5xx 면 `UNRESOLVED` |
+| GET | `/api/admin/employees/{employeeNo}/background-checks` | 이력(최신순). 판정만. 보관 기간이 지났으면 빈 목록 |
+| GET | `/api/admin/background-checks/{id}` | 상세 결과(범죄·학력·경력). `Cache-Control: no-store`. 저장된 결과만 읽고 외부 API 를 부르지 않는다. 보관 기간이 지났으면 404 |
+
+- 결과는 백그라운드 폴링이 채운다: 첫 폴링은 POST 후 25초, 간격 10초 고정, 5분이 지나면 `UNRESOLVED`. Retry-After 는 따르지 않는다. 값의 근거는 [MEASUREMENTS.md](MEASUREMENTS.md) §7.
+- MEASUREMENTS §7 의 "동기 GET(2초 × 최대 8회, 예산 10초)" 경로는 두지 않았다. 결과는 DB 에서만 읽고, 진행 중인 건은 폴링이 갱신한다.
 
 ### 기타
 | 메서드 | 경로 | 설명 |
