@@ -143,11 +143,19 @@
   - 나중에 `BGCHECK_API_KEY`에도 같은 원칙을 적용한다.
 - 반대 선택의 장점: clone 후 `.env` 없이 바로 실행된다.
 
-**AI가 처음에 잘못 만든 것 ① — 로컬 DB 사용자 기본값** (B 항목 후보, 코드 리딩으로 발견)
-- AI가 `PGUSER` 기본값을 `postgres`로 계획했다.
-- 하지만 Homebrew로 설치한 Postgres에는 `postgres` 계정이 없고, 설치할 때 macOS 사용자 이름으로 관리자 계정이 만들어진다.
-- 그대로 갔다면 로컬에서 `role "postgres" does not exist` 오류가 났을 것이다.
-- 위의 기본값 논의 중에 발견했고, `.env`에 실제 로컬 사용자를 적는 방식으로 해결했다.
+**AI가 처음에 잘못 판단한 것 ① — 로컬 DB 환경을 단정** (B 항목 후보, **로그로 발견**)
+- 처음 판단:
+  - AI가 `brew list`에 `postgresql@16`이 있는 것만 보고 로컬 DB를 Homebrew로 단정했다.
+  - 그래서 "Homebrew엔 `postgres` 계정이 없으니 `PGUSER` 기본값 `postgres`는 틀렸다"고 스스로 정정했다.
+- 실제 상황:
+  - 로컬 검증 중 `brew services`가 `error` 상태인 것을 봤다.
+  - 서비스 로그(`/opt/homebrew/var/log/postgresql@16.log`)에 `could not bind ... Address already in use`가 있었다.
+  - `ps`로 확인하니 5432는 **EDB 설치판 PostgreSQL 17**(`/Library/PostgreSQL/17`, 시스템 LaunchDaemon)이 쓰고 있었다. EDB는 `postgres` 계정과 비밀번호를 만든다.
+- 놓친 이유: 처음에 `lsof`로 5432를 확인했는데, 다른 사용자(postgres)로 실행되는 프로세스는 권한 없이 보이지 않아 "비어 있음"으로 잘못 읽었다.
+- 결과:
+  - 로컬 DB는 EDB 17(`postgres` 계정)을 쓴다.
+  - "비밀번호에 기본값을 두지 않는다"는 결정은 오히려 근거가 강해졌다. 실제 로컬 DB에 비밀번호가 있다.
+- 교훈: 포트 점유는 `lsof` 결과만으로 판단하지 말고 서비스 로그와 `ps`로 교차 확인한다.
 
 **AI 제안을 사용자 지적으로 바꾼 것 ② — SPA 폴백 범위** (A 항목 후보)
 - AI가 처음 제안한 것: 파일이 없고 `/api`가 아니면 전부 `index.html`로 폴백한다.
@@ -185,3 +193,21 @@
 **구현 중 AI가 스스로 고친 것** (B 후보, 코드 리딩)
 - 임시 SecurityConfig에서 formLogin과 httpBasic을 끄면 미인증 응답의 기본값이 **403**이 된다. 계획에는 "/api/**는 401"이라고 적었으므로 `HttpStatusEntryPoint(UNAUTHORIZED)`를 명시했다.
 - 설치된 라우터가 `react-router-dom`이었는데, v7부터 권장 패키지가 `react-router`라서 교체했다. 실제 설치된 버전은 v8.4이며 `BrowserRouter`/`Routes`가 있는 것을 확인했다.
+
+**로컬 검증 결과** (EDB PostgreSQL 17.11, `backend/.env`)
+- 진행 중 문제: `.env`에 `PGPASSWORD`만 있어서 psql이 소켓·macOS 사용자로 접속하다 실패했다. 비밀번호 줄은 두고 비밀이 아닌 `PGHOST`/`PGPORT`/`PGDATABASE`/`PGUSER`만 추가했다. AI는 `.env` 값을 화면에 출력하지 않고 키 이름과 길이만 확인했다.
+- 검증 절차: `./gradlew test` 통과 → Dockerfile 절차를 수동으로 재현(프론트 build → `static/` 복사 → `bootJar` → `java -jar`)
+
+| 요청 | 결과 | 기대 |
+|---|---|---|
+| `/api/health` | 200 JSON | ✅ |
+| `/actuator/health` | 200 `UP` (DB 포함) | ✅ |
+| `/api/unknown` | 401 | ✅ index.html로 폴백되지 않음 |
+| `/`, `/admin`, `/admin/employees/EMP-001` | 200 `text/html` | ✅ SPA 폴백 |
+| `/assets/index-*.js` (실제 파일) | 200 `text/javascript` | ✅ |
+| `/assets/old-hash.js`, `/robots.txt` (없는 파일) | 404 | ✅ 확장자 규칙 |
+| Vite dev `localhost:5173/api/health` | 200 (프록시) | ✅ |
+
+- 남은 경고(의도된 것):
+  - Flyway `No migrations found`: 스키마는 `feat/employee-schema`에서 작성한다.
+  - `Using generated security password`: 로그인은 `feat/auth`에서 구현한다.
