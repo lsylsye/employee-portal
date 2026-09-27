@@ -130,7 +130,9 @@ export function createClient({ runId, exp, rps = 10, probeOnError = true, record
       if (json.totalCount !== undefined) rec.totalCount = json.totalCount
       if (recordBody) rec.body = json
     }
-    appendFileSync(fileOf(e), JSON.stringify(rec) + '\n')
+    // 외부 API 가 GET 상세 응답 본문에 명세에 없는 tenant/tenantEmployee 필드로 후보자 키를 돌려준다(run1 에서 발견).
+    // 어떤 필드로 새어 들어오든 기록 직전에 키 문자열을 가린다.
+    appendFileSync(fileOf(e), JSON.stringify(rec).replaceAll(apiKey, '[REDACTED]') + '\n')
 
     if (method === 'GET' && probeOnError && e !== 'e6' && (rec.httpStatus === 500 || rec.httpStatus === 503)) {
       probes.push(probe(path, rec))
