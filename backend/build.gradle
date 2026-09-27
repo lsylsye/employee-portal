@@ -50,6 +50,8 @@ tasks.named('test') {
 	// 테스트는 외부 BG API 를 절대 부르지 않는다(측정 오염 방지, 본인 키 외 호출 금지).
 	// 주소를 닫힌 로컬 포트로 덮어써서, 실수로 호출해도 외부에 닿지 않고 바로 실패한다. 클라이언트 테스트는 stub 으로 한다.
 	environment 'BGCHECK_BASE_URL', 'http://localhost:1'
+	// 백그라운드 폴링은 끄고, 테스트가 pollOnce() 를 직접 부른다(스케줄러가 테스트 데이터를 건드리지 않게).
+	environment 'BG_POLLING_ENABLED', 'false'
 }
 
 // 로컬 실행에서만 local 프로필(SQL 로그)을 켠다.

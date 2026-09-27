@@ -23,6 +23,11 @@ public enum ErrorCode {
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다"),
     EMPLOYEE_NOT_FOUND(HttpStatus.NOT_FOUND, "직원을 찾을 수 없습니다"),
     BIRTH_DATE_IN_FUTURE(HttpStatus.BAD_REQUEST, "생년월일은 오늘 이후일 수 없습니다"),
+    BACKGROUND_CHECK_NOT_FOUND(HttpStatus.NOT_FOUND, "신원조회 결과를 찾을 수 없습니다"),
+    BACKGROUND_CHECK_IN_PROGRESS(HttpStatus.CONFLICT, "이미 진행 중인 신원조회가 있습니다"),
+    /** 생년월일이 없으면 외부 API 가 400 을 준다(실측 E0). 임의 날짜로 채우지 않는다. */
+    BIRTH_DATE_REQUIRED(HttpStatus.UNPROCESSABLE_CONTENT, "생년월일 확인이 필요합니다"),
+    EMPLOYEE_ACCESS_BLOCKED(HttpStatus.UNPROCESSABLE_CONTENT, "퇴사 처리된 직원은 신원조회를 할 수 없습니다"),
     CSRF_INVALID(HttpStatus.FORBIDDEN, "보안 토큰이 없거나 올바르지 않습니다. 페이지를 새로고침해 주세요");
 
     private final HttpStatus status;
