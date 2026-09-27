@@ -165,3 +165,23 @@
 - 임시 SecurityConfig를 둔다. health와 정적 파일은 열고 `/api/**`는 인증을 요구한다. `feat/auth`에서 교체한다.
 - Docker 빌드에서는 테스트를 제외한다(`-x test`). contextLoads 테스트가 DB를 요구해서, 테스트는 로컬 DB로 따로 돌린다.
 - Railway 첫 배포는 배포 브랜치를 임시로 `chore/deploy-setup`에 두고 확인한다. 병합 후 `main`으로 되돌린다.
+
+**논의 — Dockerfile vs Railway 자동 빌드(Railpack)** → **Dockerfile** (사용자 확정)
+- 사용자 질문: "Dockerfile 말고 Railway 자동 빌드로 하면 안 되는 이유가 있어?"
+- AI 설명: 자동 빌드는 폴더를 보고 언어 하나를 추측한다. 이 레포는 루트에 빌드 파일이 없고 backend(Java)와 frontend(Node)를 JAR 하나로 합쳐야 해서 그대로는 맞지 않는다.
+- 자동 빌드로 가는 대안들:
+  - 루트 디렉터리를 `backend`로 지정: 프론트가 빠진다.
+  - `railpack.json`으로 두 언어 지정: Dockerfile만큼 작성해야 하고 Railway 전용 형식이다.
+  - Gradle이 npm까지 실행: 설정이 복잡해진다.
+  - 서비스 2개로 분리: 앞서 피한 CORS·쿠키 문제가 되살아난다.
+- Dockerfile 근거:
+  1. JDK 17과 Node 22 버전을 명시적으로 고정한다.
+  2. 빌드 과정 전체가 파일 하나에 보여서 면접에서 설명하기 쉽다.
+  3. Railway에 묶이지 않는다.
+- 반대 선택의 장점: 관리할 파일이 적고, 캐시와 베이스 이미지 갱신을 Railway가 맡는다.
+- 한계: 로컬에 Docker가 없어서 Dockerfile은 Railway 빌드로만 검증된다.
+- 부수 변경: Dockerfile이 버전 번호와 관계없이 결과물을 찾도록 `bootJar` 결과 이름을 `app.jar`로 고정했다.
+
+**구현 중 AI가 스스로 고친 것** (B 후보, 코드 리딩)
+- 임시 SecurityConfig에서 formLogin과 httpBasic을 끄면 미인증 응답의 기본값이 **403**이 된다. 계획에는 "/api/**는 401"이라고 적었으므로 `HttpStatusEntryPoint(UNAUTHORIZED)`를 명시했다.
+- 설치된 라우터가 `react-router-dom`이었는데, v7부터 권장 패키지가 `react-router`라서 교체했다. 실제 설치된 버전은 v8.4이며 `BrowserRouter`/`Routes`가 있는 것을 확인했다.
