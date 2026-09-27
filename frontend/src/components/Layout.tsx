@@ -74,8 +74,8 @@ function Sidebar() {
         ))}
       </nav>
       <div className="mt-auto border-t pt-4">
-        <p className="px-2 text-sm font-medium">{user!.displayName}</p>
-        <p className="px-2 text-xs text-muted-foreground">{user!.role === 'ADMIN' ? user!.username : user!.employeeNo}</p>
+        <p className="px-2 text-sm font-medium">{user!.role === 'ADMIN' ? '관리자' : '직원'}</p>
+        <p className="px-2 text-xs text-muted-foreground">{user!.loginId}</p>
         <Button variant="ghost" className="mt-2 w-full justify-start" onClick={onLogout}>
           <LogOut aria-hidden />
           로그아웃하기

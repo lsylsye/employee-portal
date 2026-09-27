@@ -20,7 +20,7 @@ const SCREEN_REFRESH_MS = 3000
 /** 관리자 전용: 신원 조회 실행과 결과 (판단 2·3) */
 export function BackgroundCheckCard({ employee }: { employee: EmployeeDetail }) {
   const { employeeNo } = employee
-  const { data: checks, setData, error, loading, reload } = useLoad(() => api.listBackgroundChecks(employeeNo), employeeNo)
+  const { data: checks, error, loading, reload } = useLoad(() => api.listBackgroundChecks(employeeNo), employeeNo)
 
   const hasPending = checks?.some((c) => c.status === 'pending') ?? false
 
@@ -35,7 +35,7 @@ export function BackgroundCheckCard({ employee }: { employee: EmployeeDetail }) 
 
   // 실행할 수 없는 이유. 버튼을 막고 이유를 보여 준다
   const blockedReason =
-    employee.status === 'RESIGNED'
+    employee.status === 'BLOCKED'
       ? '퇴사한 직원은 신원 조회를 할 수 없어요.'
       : !employee.birthDate
         ? '생년월일이 확인되지 않아 신원 조회를 할 수 없어요. 신원 정보에서 생년월일을 먼저 입력해 주세요.'
@@ -44,8 +44,8 @@ export function BackgroundCheckCard({ employee }: { employee: EmployeeDetail }) 
           : null
 
   async function run() {
-    const created = await api.requestBackgroundCheck(employeeNo)
-    setData([created, ...(checks ?? [])])
+    await api.requestBackgroundCheck(employeeNo)
+    await reload()
     toast.info('신원 조회를 요청했어요. 결과가 나오면 알려 드릴게요.')
   }
 

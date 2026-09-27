@@ -34,13 +34,13 @@ export function EmploymentBadge({ status }: { status: EmploymentStatus }) {
           재직
         </StatusBadge>
       )
-    case 'RESIGN_SCHEDULED':
+    case 'BLOCK_SCHEDULED':
       return (
         <StatusBadge tone="warning" icon={Clock}>
           퇴사 예정
         </StatusBadge>
       )
-    case 'RESIGNED':
+    case 'BLOCKED':
       return (
         <StatusBadge tone="neutral" icon={Ban}>
           퇴사

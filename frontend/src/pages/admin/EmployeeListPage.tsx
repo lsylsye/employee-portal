@@ -72,7 +72,7 @@ export function EmployeeListPage() {
                     <TableCell>
                       <EmploymentBadge status={e.status} />
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{e.accessBlockedFrom ?? '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{e.accessBlockedOn ?? '-'}</TableCell>
                     <TableCell>
                       <BgBadge status={e.latestBgStatus} />
                     </TableCell>

@@ -12,7 +12,7 @@ export function LoginPage() {
   const { user, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [username, setUsername] = useState('')
+  const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -24,7 +24,7 @@ export function LoginPage() {
     setSubmitting(true)
     setError(null)
     try {
-      const u = await login({ username: username.trim(), password })
+      const u = await login({ loginId: loginId.trim(), password })
       // 로그인 전에 가려던 화면이 역할에 맞으면 그리로 보낸다
       const from = (location.state as { from?: string } | null)?.from
       const home = homeOf(u.role)
@@ -48,10 +48,10 @@ export function LoginPage() {
           <form onSubmit={onSubmit} className="grid gap-4">
             <Field
               label="아이디"
-              placeholder="EMP-001"
+              placeholder="EMP-003"
               autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={loginId}
+              onChange={(e) => setLoginId(e.target.value)}
               required
             />
             <Field

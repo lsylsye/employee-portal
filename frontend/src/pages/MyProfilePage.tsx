@@ -38,33 +38,52 @@ export function MyProfilePage() {
 
         <ContactCard profile={profile} onSaved={setData} />
 
-        {/* 판단 (3) b안: 조회 일자와 진행 상태만 보여 준다 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>신원 조회 내역</CardTitle>
-            <CardDescription>조회 결과 내용은 인사 담당자에게 따로 요청할 수 있어요.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {profile.backgroundChecks.length === 0 ? (
-              <EmptyState title="신원 조회 내역이 없어요" />
-            ) : (
-              <ul className="divide-y text-sm">
-                {profile.backgroundChecks.map((c) => (
-                  <li key={c.requestedAt} className="flex justify-between py-2">
-                    <span>{formatKst(c.requestedAt)}</span>
-                    <span className="text-muted-foreground">{c.state === 'IN_PROGRESS' ? '진행 중' : '완료'}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+        <MyBackgroundChecks />
       </div>
     </>
   )
 }
 
-/** 연락처: 읽기 모드 ↔ 편집 모드 */
+/** 판단 (3) b안: 조회 일자와 진행 상태만 보여 준다 */
+function MyBackgroundChecks() {
+  const { data: checks, error, loading } = useLoad(() => api.listMyBackgroundChecks())
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>신원 조회 내역</CardTitle>
+        <CardDescription>조회 결과 내용은 인사 담당자에게 따로 요청할 수 있어요.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Loading />
+        ) : error || !checks ? (
+          <InlineError>{error ?? '조회 내역을 불러오지 못했어요.'}</InlineError>
+        ) : checks.length === 0 ? (
+          <EmptyState title="신원 조회 내역이 없어요" />
+        ) : (
+          <ul className="divide-y text-sm">
+            {checks.map((c) => (
+              <li key={c.requestedAt} className="flex justify-between py-2">
+                <span>{formatKst(c.requestedAt)}</span>
+                <span className="text-muted-foreground">{c.state === 'IN_PROGRESS' ? '진행 중' : '완료'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+const CONTACT_LABELS: [keyof ContactFields, string][] = [
+  ['phone', '연락처'],
+  ['email', '이메일'],
+  ['address', '주소'],
+  ['emergencyContact', '비상연락처'],
+]
+
+/** 연락처: 읽기 모드 ↔ 편집 모드. 즉시 반영, 승인·이력 없음 (판단 4) */
 function ContactCard({ profile, onSaved }: { profile: MyProfile; onSaved: (p: MyProfile) => void }) {
   const [editing, setEditing] = useState(false)
 
@@ -72,6 +91,7 @@ function ContactCard({ profile, onSaved }: { profile: MyProfile; onSaved: (p: My
     <Card>
       <CardHeader>
         <CardTitle>연락처</CardTitle>
+        <CardDescription>저장하면 바로 반영돼요.</CardDescription>
         {!editing && (
           <CardAction>
             <Button variant="outline" onClick={() => setEditing(true)}>
@@ -93,13 +113,7 @@ function ContactCard({ profile, onSaved }: { profile: MyProfile; onSaved: (p: My
             }}
           />
         ) : (
-          <InfoList
-            items={[
-              ['휴대전화', profile.phone || '-'],
-              ['이메일', profile.email || '-'],
-              ['주소', profile.address || '-'],
-            ]}
-          />
+          <InfoList items={CONTACT_LABELS.map(([key, label]) => [label, profile[key] || '-'])} />
         )}
       </CardContent>
     </Card>
@@ -107,23 +121,36 @@ function ContactCard({ profile, onSaved }: { profile: MyProfile; onSaved: (p: My
 }
 
 function ContactForm({ profile, onCancel, onSaved }: { profile: MyProfile; onCancel: () => void; onSaved: (p: MyProfile) => void }) {
-  const [form, setForm] = useState<ContactFields>({ phone: profile.phone, email: profile.email, address: profile.address })
+  // 입력창은 빈 문자열로 다루고, 보낼 때 빈 값은 null 로 바꾼다
+  const [form, setForm] = useState<Record<keyof ContactFields, string>>({
+    phone: profile.phone ?? '',
+    email: profile.email ?? '',
+    address: profile.address ?? '',
+    emergencyContact: profile.emergencyContact ?? '',
+  })
   const { error, submitting, submit } = useSubmit()
 
   const set = (key: keyof ContactFields) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value })
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
-    void submit(async () => onSaved(await api.updateMyProfile(form)))
+    const req: ContactFields = {
+      phone: form.phone.trim() || null,
+      email: form.email.trim() || null,
+      address: form.address.trim() || null,
+      emergencyContact: form.emergencyContact.trim() || null,
+    }
+    void submit(async () => onSaved(await api.updateMyProfile(req)))
   }
 
   return (
     <form onSubmit={onSubmit} className="grid gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="휴대전화" value={form.phone} onChange={set('phone')} />
+        <Field label="연락처" type="tel" value={form.phone} onChange={set('phone')} />
         <Field label="이메일" type="email" value={form.email} onChange={set('email')} />
       </div>
       <Field label="주소" value={form.address} onChange={set('address')} />
+      <Field label="비상연락처" value={form.emergencyContact} onChange={set('emergencyContact')} hint="이름과 관계, 전화번호를 함께 적어 주세요." />
       {error && <InlineError>{error}</InlineError>}
       <div className="flex gap-2">
         <Button type="submit" disabled={submitting}>

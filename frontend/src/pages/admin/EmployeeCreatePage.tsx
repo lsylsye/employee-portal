@@ -50,13 +50,13 @@ export function EmployeeCreatePage() {
               items={[
                 ['사번', created.employee.employeeNo],
                 ['성명', created.employee.fullName],
-                ['아이디', <span className="font-mono">{created.username}</span>],
-                ['초기 비밀번호', <span className="font-mono">{created.initialPassword}</span>],
+                ['아이디', <span className="font-mono">{created.loginId}</span>],
+                ['임시 비밀번호', <span className="font-mono">{created.temporaryPassword}</span>],
               ]}
             />
             <p className="flex items-center gap-2 text-sm font-medium">
               <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              초기 비밀번호는 지금만 볼 수 있어요.
+              임시 비밀번호는 지금만 볼 수 있어요. 첫 로그인 뒤에도 바꾸지 않아도 돼요.
             </p>
           </CardContent>
           <CardFooter className="gap-2">

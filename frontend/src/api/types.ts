@@ -1,75 +1,79 @@
-// 프론트 ↔ 백엔드 API 계약. 백엔드 DTO(record)는 이 형태를 기준으로 만든다.
+// 프론트 ↔ 백엔드 API 계약. 기준은 루트 README "API 목록"이다.
 // 날짜는 'YYYY-MM-DD'(KST 기준 날짜), 시각은 ISO-8601 UTC 문자열. 화면에서 KST로 바꿔 보여준다(N15).
-// ⚠️ 잠정: 아직 판단하지 않은 항목. 확정되면 이 주석을 지운다.
+// 필드 이름은 백엔드 엔티티(Employee)와 같게 둔다. [미구현] 표시는 백엔드가 아직 없는 API 라서,
+// 구현할 때 이 이름을 따르거나 여기를 고친다.
 
 export type Role = 'ADMIN' | 'EMPLOYEE'
 
-/** 세션 사용자. GET /api/auth/me, POST /api/auth/login 응답 */
+/** GET /api/auth/me, POST /api/auth/login 응답 (AuthController.MeResponse) */
 export type SessionUser = {
-  username: string
+  loginId: string
   role: Role
-  /** 관리자는 직원 레코드가 없어서 null (⚠️ 잠정 F-c: 관리자는 시드 밖 별도 계정) */
+  /** 관리자는 직원 레코드가 없는 별도 계정이라 null (F-c) */
   employeeNo: string | null
-  displayName: string
 }
 
-export type LoginRequest = { username: string; password: string }
+/** POST /api/auth/login 요청 */
+export type LoginRequest = { loginId: string; password: string }
 
-/** 직원이 직접 고칠 수 있는 인적사항 (⚠️ 잠정 F-a) */
+/** 오류 응답 { code, message } (common.ApiError) */
+export type ApiErrorBody = { code: string; message: string }
+
+/** 직원이 직접 고칠 수 있는 인적사항 (F-a). 성명·생년월일은 관리자만 수정(F-b) */
 export type ContactFields = {
-  phone: string
-  email: string
-  address: string
+  phone: string | null
+  email: string | null
+  address: string | null
+  emergencyContact: string | null
 }
 
-/**
- * 직원 본인 정보. GET /api/me
- * 성명·생년월일은 BG 조회 입력값이라 본인이 수정하지 않는다(F-b).
- */
+/** [미구현] GET /api/me/profile */
 export type MyProfile = ContactFields & {
   employeeNo: string
   fullName: string
   birthDate: string | null
-  /** 판단 (3) b안: 조회 일자와 진행 상태만. 판정·상세는 주지 않는다 */
-  backgroundChecks: { requestedAt: string; state: 'IN_PROGRESS' | 'DONE' }[]
 }
 
-/** PUT /api/me 요청. 즉시 반영 (⚠️ 잠정: 판단 (4) 미정) */
+/** [미구현] PATCH /api/me/profile. 허용 필드만 받는 전용 DTO (판단 4) */
 export type UpdateMyProfileRequest = ContactFields
+
+/** [미구현] GET /api/me/background-checks 항목. 조회 일자와 진행 상태만 (판단 3) */
+export type MyBackgroundCheck = { requestedAt: string; state: 'IN_PROGRESS' | 'DONE' }
 
 /**
  * 재직 상태. 저장하지 않고 접근 차단일과 오늘(KST)로 계산한다(DECISIONS 1).
- * - ACTIVE: 차단일 없음
- * - RESIGN_SCHEDULED: 차단일 > 오늘
- * - RESIGNED: 차단일 <= 오늘
+ * - ACTIVE 재직: 차단일 없음
+ * - BLOCK_SCHEDULED 차단 예정: 차단일 > 오늘
+ * - BLOCKED 차단: 차단일 <= 오늘
  */
-export type EmploymentStatus = 'ACTIVE' | 'RESIGN_SCHEDULED' | 'RESIGNED'
+export type EmploymentStatus = 'ACTIVE' | 'BLOCK_SCHEDULED' | 'BLOCKED'
 
-/** 외부 API 상태 + 우리 쪽 폴링 포기 상태(N11) */
+/** 외부 API 상태 + 우리 쪽 폴링 포기 상태(N11, 화면 표기 "추적 실패") */
 export type BgStatus = 'pending' | 'clear' | 'flagged' | 'needs_attention'
 
-/** GET /api/admin/employees 항목. 동명이인 구분을 위해 사번·생년월일을 항상 같이 준다(F-i) */
+/** [미구현] GET /api/admin/employees 항목. 동명이인 구분을 위해 사번·생년월일을 항상 같이 준다(F-i) */
 export type EmployeeSummary = {
   employeeNo: string
   fullName: string
   birthDate: string | null
   status: EmploymentStatus
-  accessBlockedFrom: string | null
+  accessBlockedOn: string | null
   /** 목록에는 판정만 (판단 3) */
   latestBgStatus: BgStatus | null
 }
 
-/** GET /api/admin/employees/{employeeNo} */
+/** [미구현] GET /api/admin/employees/{employeeNo} */
 export type EmployeeDetail = EmployeeSummary &
   ContactFields & {
     /** lastName = 성. 문자열 분리가 아니라 저장된 값을 쓴다 */
     lastName: string
     firstName: string
-    username: string
+    /** 계정이 없으면 null (시드 9명은 계정 없음) */
+    loginId: string | null
   }
 
 /**
- * POST /api/admin/employees 요청. 사번은 서버가 발급한다.
+ * [미구현] POST /api/admin/employees. 사번은 서버가 시퀀스로 발급(EMP-011~).
  * 생년월일은 비워 둘 수 있다(EMP-007 같은 경우). 대신 BG 실행이 막힌다.
  */
 export type CreateEmployeeRequest = {
@@ -78,24 +82,24 @@ export type CreateEmployeeRequest = {
   birthDate: string | null
 }
 
-/** POST /api/admin/employees 응답 (⚠️ 잠정 F-d: 아이디=사번, 초기 비밀번호는 이 응답에서 한 번만 보여준다) */
+/** [미구현] POST /api/admin/employees 응답. 아이디=사번, 임시 비밀번호는 이 응답에서 한 번만 온다(F-d) */
 export type CreateEmployeeResponse = {
   employee: EmployeeDetail
-  username: string
-  initialPassword: string
+  loginId: string
+  temporaryPassword: string
 }
 
-/** PATCH /api/admin/employees/{employeeNo}: 성·이름 정정, 생년월일 입력(F-e) */
-export type UpdateEmployeeIdentityRequest = {
+/** [미구현] PATCH /api/admin/employees/{employeeNo}: 성·이름 정정, 생년월일 입력(F-e) */
+export type UpdateEmployeeRequest = {
   lastName: string
   firstName: string
   birthDate: string | null
 }
 
-/** POST /api/admin/employees/{employeeNo}/resignation. 차단일 기본값은 오늘(KST) */
-export type ResignRequest = { accessBlockedFrom: string }
+/** [미구현] PUT /api/admin/employees/{employeeNo}/access-block. 그날 00:00 KST 부터 차단 */
+export type AccessBlockRequest = { blockedOn: string }
 
-/** GET /api/admin/employees/{employeeNo}/background-checks 항목. 판정만 */
+/** [미구현] GET /api/admin/employees/{employeeNo}/background-checks 항목. 판정만 */
 export type BgCheckSummary = {
   id: number
   requestedAt: string
@@ -104,7 +108,7 @@ export type BgCheckSummary = {
 }
 
 /**
- * GET /api/admin/background-checks/{id}. "결과 보기"로 열 때만 호출하고, 열람 기록이 남는다.
+ * [미구현] GET /api/admin/background-checks/{id}. "결과 보기"로 열 때만 호출하고, 열람 기록이 남는다.
  * creditScore는 수집하지 않는다(최소 수집). 응답은 Cache-Control: no-store.
  */
 export type BgCheckDetail = BgCheckSummary & {
@@ -112,6 +116,3 @@ export type BgCheckDetail = BgCheckSummary & {
   educationVerified: boolean | null
   employmentVerified: boolean | null
 }
-
-/** 오류 응답 공통 형태 */
-export type ApiErrorBody = { message: string }
