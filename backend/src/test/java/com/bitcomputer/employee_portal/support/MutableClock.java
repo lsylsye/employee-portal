@@ -1,21 +1,21 @@
-package com.bitcomputer.employee_portal.auth;
+package com.bitcomputer.employee_portal.support;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 
 /** 테스트에서 시각을 옮기기 위한 Clock. 시간대는 운영과 같은 Asia/Seoul. */
-class MutableClock extends Clock {
+public class MutableClock extends Clock {
 
     private final ZoneId zone;
     private volatile Instant instant;
 
-    MutableClock(Instant instant, ZoneId zone) {
+    public MutableClock(Instant instant, ZoneId zone) {
         this.instant = instant;
         this.zone = zone;
     }
 
-    void set(Instant instant) {
+    public void set(Instant instant) {
         this.instant = instant;
     }
 

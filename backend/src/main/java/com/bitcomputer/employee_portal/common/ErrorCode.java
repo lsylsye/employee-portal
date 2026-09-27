@@ -21,6 +21,8 @@ public enum ErrorCode {
     /** 이미 로그인한 세션이 차단됐을 때. 본인 확인이 끝난 상태라 차단 사실을 알려도 된다. */
     ACCESS_BLOCKED(HttpStatus.UNAUTHORIZED, "접근이 차단된 계정입니다"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다"),
+    EMPLOYEE_NOT_FOUND(HttpStatus.NOT_FOUND, "직원을 찾을 수 없습니다"),
+    BIRTH_DATE_IN_FUTURE(HttpStatus.BAD_REQUEST, "생년월일은 오늘 이후일 수 없습니다"),
     CSRF_INVALID(HttpStatus.FORBIDDEN, "보안 토큰이 없거나 올바르지 않습니다. 페이지를 새로고침해 주세요");
 
     private final HttpStatus status;

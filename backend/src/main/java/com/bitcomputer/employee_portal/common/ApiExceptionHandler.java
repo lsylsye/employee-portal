@@ -14,6 +14,11 @@ public class ApiExceptionHandler {
         return respond(ErrorCode.INVALID_REQUEST);
     }
 
+    @ExceptionHandler(ApiException.class)
+    ResponseEntity<ApiError> apiException(ApiException e) {
+        return respond(e.getErrorCode());
+    }
+
     public static ResponseEntity<ApiError> respond(ErrorCode code) {
         return ResponseEntity.status(code.getStatus()).body(code.toBody());
     }

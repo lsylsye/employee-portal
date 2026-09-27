@@ -50,11 +50,11 @@
 ### 관리자: 직원 — `feat/admin-employee`
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/api/admin/employees` | 목록. 사번, 성명, 생년월일, 상태(재직/차단 예정/차단), 최근 BG 판정 |
-| POST | `/api/admin/employees` | 직원 등록 + 계정 생성(F3). 사번은 서버가 발급(EMP-011~). 응답에 임시 비밀번호를 **한 번만** 담는다 |
+| GET | `/api/admin/employees` | 목록(사번순). 사번, 성명, 생년월일, 상태(`ACTIVE`/`BLOCK_SCHEDULED`/`BLOCKED`), 차단일. 최근 BG 판정은 `feat/background-check` 에서 추가 |
+| POST | `/api/admin/employees` | 직원 등록 + 계정 생성(F3). 201. 사번은 서버가 발급(EMP-011~). 응답에 임시 비밀번호(16자)를 **한 번만** 담는다(`no-store`). 생년월일은 비워 둘 수 있다 |
 | GET | `/api/admin/employees/{employeeNo}` | 상세 |
-| PATCH | `/api/admin/employees/{employeeNo}` | 수정. 성·이름·생년월일 포함 |
-| PUT | `/api/admin/employees/{employeeNo}/access-block` | `{ blockedOn }` 접근 차단일 설정(퇴사 처리). 기본값 오늘, 그날 00:00 KST 부터 차단 |
+| PATCH | `/api/admin/employees/{employeeNo}` | 수정. 성·이름·생년월일 포함. 보내지 않은(null) 필드는 바꾸지 않는다. 성명은 성+이름으로 다시 만든다 |
+| PUT | `/api/admin/employees/{employeeNo}/access-block` | `{ blockedOn }` 접근 차단일 설정(퇴사 처리). 본문을 비우면 오늘. 그날 00:00 KST 부터 차단. 오늘 이하면 그 직원의 세션을 즉시 삭제 |
 | DELETE | `/api/admin/employees/{employeeNo}/access-block` | 차단 취소(오입력 정정) |
 
 ### 관리자: Background Check — `feat/background-check`
