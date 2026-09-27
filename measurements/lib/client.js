@@ -85,9 +85,10 @@ export function createClient({ runId, exp, rps = 10, probeOnError = true, record
 
   async function request(method, path, { body, meta = {}, e = exp } = {}) {
     if (!hasBudget(e)) return { skipped: true, reason: 'budget' }
-    await throttle()
-    ownCount(e)
+    // 상한 확인 직후 await 없이 바로 예약한다. (throttle 대기 뒤에 세면, 대기 중이던 요청들이
+    // 모두 확인을 통과해 상한을 넘는다 — run1 E6 에서 203/200 으로 관측)
     counts[e]++
+    await throttle()
     inFlight++
 
     const rec = { ts: new Date().toISOString(), runId, exp: e, seq: ++seq, method, path, timeoutMs: REQUEST_TIMEOUT_MS, ...meta }
