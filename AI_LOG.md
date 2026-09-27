@@ -211,3 +211,19 @@
 - 남은 경고(의도된 것):
   - Flyway `No migrations found`: 스키마는 `feat/employee-schema`에서 작성한다.
   - `Using generated security password`: 로그인은 `feat/auth`에서 구현한다.
+
+**논의 — local/dev 환경 설정 분리** → 지금은 분리하지 않고, **`feat/employee-schema`에서 필요할 때 `local` 프로필 추가** (사용자 확정)
+- 사용자 질문: "dev env랑 local env 분리해야 하는 거 아닌가?"
+- AI가 제시한 기준:
+  - **값**만 다르면 환경변수로 관리한다(DB 접속 정보, 포트, API 키).
+  - **동작**이 다르면 프로필로 관리한다(SQL 로그, 쿠키 Secure, 에러 노출).
+  - 현재 로컬과 Railway의 차이는 전부 값이다. 그래서 프로필을 나누면 파일만 늘어난다.
+- 추가하는 방식(예정):
+  - `application-local.yaml`에는 로컬 편의 설정만 둔다.
+  - 활성화는 `build.gradle`의 `bootRun`에서 `spring.profiles.active=local`로 한다. 배포는 `java -jar`라서 자연스럽게 분리된다.
+  - `prod` 프로필은 두지 않는다. 기본 설정이 곧 운영 설정이라, 운영 프로필을 켜는 걸 잊는 실수가 없다.
+- 예정된 동작 차이:
+  - 스키마 브랜치: SQL 로그
+  - 인증 브랜치: 쿠키 Secure 속성 검토. 대부분 브라우저가 `localhost`를 안전한 주소로 취급해서 공통으로 둘 수도 있다.
+- Railway에 dev·staging 환경을 따로 두지 않는다. 서비스와 DB가 두 벌이 되고, "로컬 검증 → 브랜치 배포 → main 병합" 흐름이 이미 스테이징 역할을 한다.
+- 반대 선택(지금 local/dev 분리)의 장점: 환경별 차이가 파일로 미리 드러나고, 나중에 동작 차이가 생겨도 구조를 바꿀 필요가 없다.
