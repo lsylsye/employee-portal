@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { api, type EmployeeDetail } from '../../api'
 import { EmploymentBadge } from '../../components/status'
+import { BackgroundCheckCard } from './BackgroundCheckCard'
 import { Alert, Button, Card, Field, InfoList, Loading } from '../../components/ui'
 import { todayKst } from '../../lib/date'
 import { useLoad } from '../../lib/useLoad'
@@ -44,6 +45,8 @@ export function EmployeeDetailPage() {
         {/* key: 저장 후 서버 값으로 폼을 다시 채운다 */}
         <IdentityForm key={`${employee.lastName}/${employee.firstName}/${employee.birthDate}`} employee={employee} onSaved={setData} />
       </div>
+
+      <BackgroundCheckCard employee={employee} />
 
       <ResignationCard employee={employee} onSaved={setData} />
     </div>
