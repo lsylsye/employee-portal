@@ -77,6 +77,7 @@ export default defineConfig([
 ## 디자인 규칙
 
 - 미니멀한 사내 관리자 화면: 뉴트럴 그레이 + 포인트 컬러 파랑 하나. 8pt 간격, 라운드 8px, 낮은 그림자, Pretendard.
+- 글꼴: Pretendard 웹폰트(jsDelivr CDN, `src/styles/fonts.css`). 글꼴 이름은 `--font-sans` 토큰에서만 참조한다.
 - 컴포넌트는 shadcn/ui(`src/components/ui`, 가져온 그대로)를 쓰고, 테마는 `src/index.css` 변수만 고친다.
 - UX 라이팅은 해요체, 버튼은 동사형 라벨.
 

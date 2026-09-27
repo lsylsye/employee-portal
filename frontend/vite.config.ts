@@ -7,7 +7,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
-    alias: { '@': path.resolve(__dirname, './src') },
+    alias: { '@': path.resolve(import.meta.dirname, './src') },
   },
   server: {
     // 로컬 개발: /api 요청을 Spring Boot 로 넘긴다. 배포에서는 같은 JAR 이 서빙하므로 프록시가 필요 없다.

@@ -1,14 +1,14 @@
 @import 'tailwindcss';
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-/* 한글 글꼴. dynamic-subset 은 쓰는 글자 조각만 내려받는다 */
-@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+@import "./styles/fonts.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  /* 글꼴 토큰. 선언은 styles/fonts.css */
+  --font-sans: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   /* 상태 배지 색 (README 디자인 규칙). 옅은 배경 + 진한 글자 + 아이콘 */
   --color-status-success-bg: var(--status-success-bg);
   --color-status-success-fg: var(--status-success-fg);
