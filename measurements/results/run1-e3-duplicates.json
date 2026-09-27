@@ -1,0 +1,218 @@
+{
+  "a": {
+    "employeeId": "MEAS-run1-E3-001",
+    "posts": [
+      {
+        "status": 201,
+        "checkId": "CHK-1cbd7f8a-c6ca-4225-857f-33d6b69fc3d9",
+        "bodyStatus": "clear",
+        "k": 1
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-6f5da533-52b2-488d-8cf6-32fed9333f4d",
+        "bodyStatus": "pending",
+        "k": 2
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-2e6b0dc2-ff18-4a6e-9e17-6a19d2b54d8f",
+        "bodyStatus": "clear",
+        "k": 3
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-fc658fbd-c45c-45f9-8284-a2fff0942239",
+        "bodyStatus": "pending",
+        "k": 4
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-e9e3c011-aa90-4d66-8a54-bb948226c382",
+        "bodyStatus": "clear",
+        "k": 5
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-9c9722fd-5792-4ae3-9891-4526c76d22ad",
+        "bodyStatus": "pending",
+        "k": 6
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-fb5a79e9-4dea-4214-8510-cc8be0a9e6d9",
+        "bodyStatus": "clear",
+        "k": 7
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-ed5e7bbb-a26f-40eb-9da7-d067ecef9bca",
+        "bodyStatus": "pending",
+        "k": 8
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-d0527659-9b74-4cd7-bfff-29453279c9ec",
+        "bodyStatus": "clear",
+        "k": 9
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-7389948f-8260-4396-9572-401748df34bd",
+        "bodyStatus": "pending",
+        "k": 10
+      }
+    ],
+    "summary": {
+      "posts": 10,
+      "created201": 10,
+      "distinctCheckIds": 10,
+      "listTotal": null,
+      "listStatuses": null
+    }
+  },
+  "b": {
+    "employeeId": "MEAS-run1-E3-002",
+    "posts": [
+      {
+        "status": 201,
+        "checkId": "CHK-3072482a-3680-4695-b345-0dae56ff174e",
+        "bodyStatus": "clear",
+        "k": 1,
+        "variant": "김민준/1990-03-15"
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-d685d919-f176-4eb5-8c54-947eeef8ed95",
+        "bodyStatus": "clear",
+        "k": 2,
+        "variant": "남궁서준/1988-07-21"
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-b9e4d168-035b-424c-8f52-4144d21e440f",
+        "bodyStatus": "flagged",
+        "k": 3,
+        "variant": "김민준/1994-11-02"
+      }
+    ],
+    "list": {
+      "totalCount": 3,
+      "checks": [
+        {
+          "checkId": "CHK-3072482a-3680-4695-b345-0dae56ff174e",
+          "status": "clear",
+          "createdAt": "2026-09-27T16:10:58.440Z",
+          "completedAt": "2026-09-27T16:10:58.440Z"
+        },
+        {
+          "checkId": "CHK-b9e4d168-035b-424c-8f52-4144d21e440f",
+          "status": "flagged",
+          "createdAt": "2026-09-27T16:11:02.575Z",
+          "completedAt": "2026-09-27T16:11:02.575Z"
+        },
+        {
+          "checkId": "CHK-d685d919-f176-4eb5-8c54-947eeef8ed95",
+          "status": "clear",
+          "createdAt": "2026-09-27T16:11:00.500Z",
+          "completedAt": "2026-09-27T16:11:00.500Z"
+        }
+      ]
+    },
+    "summary": {
+      "posts": 3,
+      "created201": 3,
+      "distinctCheckIds": 3,
+      "listTotal": 3,
+      "listStatuses": {
+        "clear": 2,
+        "flagged": 1
+      }
+    }
+  },
+  "c": {
+    "employeeId": "MEAS-run1-E3-003",
+    "posts": [
+      {
+        "status": 201,
+        "checkId": "CHK-624780b0-35cf-4aa4-b950-594bd32bfae4",
+        "bodyStatus": "clear",
+        "k": 1,
+        "concurrent": true
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-4cda2768-4594-4b5f-a9fd-dd6c40b4837c",
+        "bodyStatus": "pending",
+        "k": 2,
+        "concurrent": true
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-fd797ea3-aa1d-4e35-8387-a26f859bf09f",
+        "bodyStatus": "pending",
+        "k": 3,
+        "concurrent": true
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-9a528fe4-5676-4947-8e60-9fb6af9311af",
+        "bodyStatus": "clear",
+        "k": 4,
+        "concurrent": true
+      },
+      {
+        "status": 201,
+        "checkId": "CHK-9f209281-ef46-43c2-a6c3-68b3bdb050af",
+        "bodyStatus": "clear",
+        "k": 5,
+        "concurrent": true
+      }
+    ],
+    "list": {
+      "totalCount": 5,
+      "checks": [
+        {
+          "checkId": "CHK-4cda2768-4594-4b5f-a9fd-dd6c40b4837c",
+          "status": "pending",
+          "createdAt": "2026-09-27T16:11:04.738Z",
+          "completedAt": null
+        },
+        {
+          "checkId": "CHK-9a528fe4-5676-4947-8e60-9fb6af9311af",
+          "status": "clear",
+          "createdAt": "2026-09-27T16:11:04.930Z",
+          "completedAt": "2026-09-27T16:11:04.930Z"
+        },
+        {
+          "checkId": "CHK-9f209281-ef46-43c2-a6c3-68b3bdb050af",
+          "status": "clear",
+          "createdAt": "2026-09-27T16:11:05.029Z",
+          "completedAt": "2026-09-27T16:11:05.029Z"
+        },
+        {
+          "checkId": "CHK-fd797ea3-aa1d-4e35-8387-a26f859bf09f",
+          "status": "pending",
+          "createdAt": "2026-09-27T16:11:04.839Z",
+          "completedAt": null
+        },
+        {
+          "checkId": "CHK-624780b0-35cf-4aa4-b950-594bd32bfae4",
+          "status": "clear",
+          "createdAt": "2026-09-27T16:11:04.631Z",
+          "completedAt": "2026-09-27T16:11:04.631Z"
+        }
+      ]
+    },
+    "summary": {
+      "posts": 5,
+      "created201": 5,
+      "distinctCheckIds": 5,
+      "listTotal": 5,
+      "listStatuses": {
+        "pending": 2,
+        "clear": 3
+      }
+    }
+  }
+}
