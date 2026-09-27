@@ -191,7 +191,8 @@ h('5. 503 의 Retry-After — 헤더 vs 본문')
   const hdr = r503.filter((r) => r.retryAfterHeader !== null && r.retryAfterHeader !== undefined)
   const body = r503.filter((r) => r.retryAfterBody !== undefined && r.retryAfterBody !== null)
   const vals = [...new Set(r503.map((r) => `${r.retryAfterHeader ?? '-'}/${r.retryAfterBody ?? '-'}`))]
-  out.push(table(['지표', '값', 'n'], [['헤더 Retry-After 있음', ci(hdr.length, r503.length), r503.length], ['본문 retryAfter 있음', ci(body.length, r503.length), r503.length], ['관측된 값(헤더/본문)', vals.join(', '), r503.length]]))
+  const none = r503.filter((r) => (r.retryAfterHeader ?? null) === null && (r.retryAfterBody ?? null) === null)
+  out.push(table(['지표', '값', 'n'], [['헤더 Retry-After 있음', ci(hdr.length, r503.length), r503.length], ['본문 retryAfter 있음', ci(body.length, r503.length), r503.length], ['헤더·본문 모두 값 없음', ci(none.length, r503.length), r503.length], ['관측된 값(헤더/본문)', vals.join(', '), r503.length]]))
 }
 
 // ---------- 6. POST 즉시 완료 / estimatedCompletionSeconds ----------
