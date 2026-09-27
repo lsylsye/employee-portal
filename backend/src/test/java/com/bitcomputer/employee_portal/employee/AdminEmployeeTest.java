@@ -137,6 +137,20 @@ class AdminEmployeeTest {
     }
 
     @Test
+    void 관리자_수정과_퇴사_처리는_관리자_이름으로_기록된다() throws Exception {
+        admin.send(patch("/api/admin/employees/EMP-006").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"lastName\":\"선\",\"firstName\":\"우진\"}")).andExpect(status().isOk());
+        admin.send(put("/api/admin/employees/EMP-006/access-block")).andExpect(status().isOk());
+        admin.send(delete("/api/admin/employees/EMP-006/access-block")).andExpect(status().isOk());
+
+        assertThat(jdbc.queryForList(
+                "SELECT l.field_name FROM employee_change_log l JOIN employee e ON e.id = l.employee_id "
+                        + "JOIN account a ON a.id = l.changed_by "
+                        + "WHERE e.employee_no = 'EMP-006' AND a.login_id = ? ORDER BY l.id", String.class, ADMIN_ID))
+                .containsExactly("lastName", "firstName", "accessBlockedOn", "accessBlockedOn");
+    }
+
+    @Test
     void 잘못된_입력은_400() throws Exception {
         register("{\"lastName\":\"김 \",\"firstName\":\"솔\"}").andExpect(status().isBadRequest());
         register("{\"lastName\":\"김\",\"firstName\":\"솔\",\"birthDate\":\"2026-10-02\"}")
