@@ -24,8 +24,7 @@
 
 ## ERD
 
-<!-- ERD 이미지: docs/erd.dbml 로 만든 다이어그램을 여기에 넣는다 -->
+<!-- ERD 이미지를 여기에 넣는다 -->
 
 ## 문서
 - [DECISIONS.md](DECISIONS.md) 설계 판단 · [MEASUREMENTS.md](MEASUREMENTS.md) BG API 실측 · [AI_LOG.md](AI_LOG.md) AI 협업 기록
-- [docs/architecture.md](docs/architecture.md) 구현 설명·데이터 모델·운영 설정·로컬 실행 · [docs/api.md](docs/api.md) API 목록
