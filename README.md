@@ -7,10 +7,13 @@
 - AI 협업 기록: [AI_LOG.md](AI_LOG.md)
 
 ## 평가 안내
+- 배포 주소: https://lsy-portal.up.railway.app
 - 제출용 계정: 관리자 `admin`, 직원 `EMP-003`. 비밀번호는 제출 메일로 따로 전달한다(레포에 두지 않는다).
-- **퇴사 처리는 제출용 직원 계정(EMP-003)이 아닌 다른 직원으로 시험해 달라.** 계정은 평가자끼리 공유한다.
-  - 새 직원을 등록하면 계정과 임시 비밀번호가 함께 발급된다. 그 직원을 퇴사 처리하면 로그인 차단까지 확인할 수 있다.
-  - 실수로 차단했다면 관리자 화면에서 차단을 취소할 수 있다.
+- 시드 직원 10명 중 **EMP-003 만 계정이 있다.** 나머지 9명은 인사 레코드만 있어 관리자 화면에서 조회·정정·퇴사 처리·신원 조회는 되지만 로그인할 수 없다.
+  직원 로그인은 EMP-003 이나 새로 등록한 직원(등록 시 계정과 임시 비밀번호가 함께 발급)으로 확인해 달라.
+- **퇴사 처리는 제출용 직원 계정(EMP-003)이 아닌, 새로 등록한 직원으로 시험해 달라.** 계정은 평가자끼리 공유한다.
+  - **퇴사일부터 7일이 지나면 영구 퇴사**라 복구할 수 없다. 7일 안에는 관리자 화면의 "계정 복구"로 되돌릴 수 있다.
+  - 퇴사 예정(미래 퇴사일)은 퇴사일만 바꿀 수 있고 취소할 수 없다.
 
 ## API 목록
 
@@ -54,8 +57,8 @@
 | POST | `/api/admin/employees` | 직원 등록 + 계정 생성(F3). 201. 사번은 서버가 발급(EMP-011~). 응답에 임시 비밀번호(16자)를 **한 번만** 담는다(`no-store`). 생년월일은 비워 둘 수 있다 |
 | GET | `/api/admin/employees/{employeeNo}` | 상세 |
 | PATCH | `/api/admin/employees/{employeeNo}` | 수정. 성·이름·생년월일 포함. 보내지 않은(null) 필드는 바꾸지 않는다. 성명은 성+이름으로 다시 만든다 |
-| PUT | `/api/admin/employees/{employeeNo}/access-block` | `{ blockedOn }` 접근 차단일 설정(퇴사 처리). 본문을 비우면 오늘. 그날 00:00 KST 부터 차단. 오늘 이하면 그 직원의 세션을 즉시 삭제 |
-| DELETE | `/api/admin/employees/{employeeNo}/access-block` | 차단 취소(오입력 정정) |
+| PUT | `/api/admin/employees/{employeeNo}/access-block` | `{ blockedOn }` 퇴사 처리·퇴사일 변경. 본문을 비우면 오늘. 그날 00:00 KST 부터 차단. 오늘 이하면 그 직원의 세션을 즉시 삭제. **이미 퇴사 효력이 생긴 직원은 409**(`RESIGNATION_ALREADY_EFFECTIVE`) |
+| DELETE | `/api/admin/employees/{employeeNo}/access-block` | **계정 복구**(퇴사 번복). 퇴사일부터 7일(설정값 `employee.recovery-window`) 안에서만. 지나면 409 `ACCOUNT_RECOVERY_EXPIRED`(영구 퇴사), 재직·퇴사 예정이면 409 `ACCOUNT_RECOVERY_NOT_AVAILABLE`. 상세 응답의 `recoverableUntil` 이 복구 가능한 마지막 날 |
 
 ### 관리자: Background Check — `feat/background-check`
 | 메서드 | 경로 | 설명 |
