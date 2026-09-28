@@ -14,6 +14,8 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public enum ErrorCode {
 
+    CURRENT_PASSWORD_INCORRECT(HttpStatus.BAD_REQUEST, "현재 비밀번호가 올바르지 않습니다"),
+    INVALID_NEW_PASSWORD(HttpStatus.BAD_REQUEST, "새 비밀번호는 8자 이상, UTF-8 기준 72바이트 이하여야 하며 현재 비밀번호와 달라야 합니다"),
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청 형식이 올바르지 않습니다"),
     /** 로그인 실패는 이유(없는 아이디, 틀린 비밀번호, 차단)와 관계없이 이 하나로 응답한다. */
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다"),

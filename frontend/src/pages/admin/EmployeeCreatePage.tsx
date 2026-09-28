@@ -56,7 +56,7 @@ export function EmployeeCreatePage() {
             />
             <p className="flex items-center gap-2 text-sm font-medium">
               <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-              임시 비밀번호는 지금만 볼 수 있어요. 첫 로그인 뒤에도 바꾸지 않아도 돼요.
+              초기 비밀번호는 지금만 볼 수 있어요. 직원은 로그인 후 비밀번호 변경 메뉴에서 바꿀 수 있어요.
             </p>
           </CardContent>
           <CardFooter className="gap-2">

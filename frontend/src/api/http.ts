@@ -51,6 +51,7 @@ const employee = (no: string) => `/api/admin/employees/${enc(no)}`
 
 export const httpApi: Api = {
   login: (req) => request('POST', '/api/auth/login', req),
+  changePassword: (req) => request('POST', '/api/auth/password', req),
   logout: () => request('POST', '/api/auth/logout'),
   currentUser: async () => {
     try {

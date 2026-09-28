@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -34,6 +35,7 @@ public class AuthController {
     private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
     private final SecurityContextRepository securityContextRepository;
     private final LogoutHandler logoutHandler;
+    private final PasswordService passwordService;
 
     public record LoginRequest(@NotBlank String loginId, @NotBlank String password) {
     }
@@ -72,6 +74,25 @@ public class AuthController {
         SecurityContextHolder.setContext(context);
         securityContextRepository.saveContext(context, httpRequest, httpResponse);
         return ResponseEntity.ok(MeResponse.of((AccountPrincipal) authentication.getPrincipal()));
+    }
+
+    /** 새 비밀번호 길이의 최종 검사(UTF-8 72바이트: BCrypt 입력 한계)는 PasswordService 가 한다. */
+    public record PasswordChangeRequest(
+            @NotBlank @Size(max = 1024) String currentPassword,
+            @NotBlank @Size(min = 8, max = 72) String newPassword) {
+    }
+
+    /**
+     * 본인 비밀번호 변경(직원·관리자). 현재 비밀번호를 확인한 뒤 바꾸고, 이 계정의 모든 세션을 끊는다.
+     * 첫 로그인 때 강제하지 않는다(선택 기능).
+     */
+    @PostMapping("/password")
+    ResponseEntity<Void> changePassword(@AuthenticationPrincipal AccountPrincipal principal,
+            @Valid @RequestBody PasswordChangeRequest body, HttpServletRequest request,
+            HttpServletResponse response, Authentication authentication) {
+        passwordService.change(principal.getLoginId(), body.currentPassword(), body.newPassword());
+        logoutHandler.logout(request, response, authentication);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/logout")

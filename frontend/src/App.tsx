@@ -5,6 +5,7 @@ import { StatusPage } from './components/common'
 import { Button } from './components/ui/button'
 import { Toaster } from './components/ui/sonner'
 import { RequireRole, RootRedirect } from './components/Layout'
+import { PasswordChangePage } from './pages/PasswordChangePage'
 import { LoginPage } from './pages/LoginPage'
 import { EmployeeCreatePage } from './pages/admin/EmployeeCreatePage'
 import { EmployeeDetailPage } from './pages/admin/EmployeeDetailPage'
@@ -38,9 +39,11 @@ function App() {
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
           <Route element={<RequireRole role="EMPLOYEE" />}>
+            <Route path="/me/password" element={<PasswordChangePage />} />
             <Route path="/me" element={<MyProfilePage />} />
           </Route>
           <Route element={<RequireRole role="ADMIN" />}>
+            <Route path="/admin/password" element={<PasswordChangePage />} />
             <Route path="/admin" element={<EmployeeListPage />} />
             <Route path="/admin/employees/new" element={<EmployeeCreatePage />} />
             <Route path="/admin/employees/:employeeNo" element={<EmployeeDetailPage />} />

@@ -92,6 +92,10 @@ class AuthAccessTest {
         requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNew.executeWithoutResult(status -> jdbc.update(
                 "DELETE FROM spring_session WHERE principal_name IN (?, ?)", EMPLOYEE_ID, ADMIN_ID));
+        if (!org.springframework.test.context.transaction.TestTransaction.isActive()) {
+            jdbc.update("DELETE FROM account WHERE login_id IN (?, ?)", EMPLOYEE_ID, ADMIN_ID);
+            jdbc.update("DELETE FROM employee WHERE employee_no = ?", EMPLOYEE_ID);
+        }
     }
 
     // ---- T1: 인증·역할 ----
@@ -181,6 +185,52 @@ class AuthAccessTest {
         mockMvc.perform(post("/api/auth/logout").cookie(session, xsrf).header("X-XSRF-TOKEN", xsrf.getValue()))
                 .andExpect(status().isNoContent());
         mockMvc.perform(get("/api/auth/me").cookie(session)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void 비밀번호_변경후_기존비밀번호와_모든_세션은_사용할수없다() throws Exception {
+        for (String id : new String[]{EMPLOYEE_ID, ADMIN_ID}) {
+            Cookie first = login(id, PASSWORD);
+            Cookie second = login(id, PASSWORD);
+            changePassword(first, PASSWORD, "new-password-123").andExpect(status().isNoContent());
+            mockMvc.perform(get("/api/auth/me").cookie(first)).andExpect(status().isUnauthorized());
+            mockMvc.perform(get("/api/auth/me").cookie(second)).andExpect(status().isUnauthorized());
+            loginRaw(id, PASSWORD).andExpect(status().isUnauthorized());
+            loginRaw(id, "new-password-123").andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    void 현재비밀번호가_틀리거나_새비밀번호가_부적절하면_변경하지않는다() throws Exception {
+        Cookie session = login(EMPLOYEE_ID, PASSWORD);
+        changePassword(session, "wrong", "new-password-123")
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_INCORRECT"));
+        changePassword(session, PASSWORD, PASSWORD).andExpect(status().isBadRequest());
+        changePassword(session, PASSWORD, "short").andExpect(status().isBadRequest());
+        changePassword(session, PASSWORD, "가".repeat(25)).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/auth/me").cookie(session)).andExpect(status().isOk());
+        loginRaw(EMPLOYEE_ID, PASSWORD).andExpect(status().isOk());
+    }
+
+    @Test
+    void 비밀번호변경은_로그인과_CSRF가_필요하다() throws Exception {
+        Cookie xsrf = xsrf(null);
+        mockMvc.perform(post("/api/auth/password").cookie(xsrf).header("X-XSRF-TOKEN", xsrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"currentPassword\":\"test-password\",\"newPassword\":\"new-password-123\"}"))
+                .andExpect(status().isUnauthorized());
+        Cookie session = login(EMPLOYEE_ID, PASSWORD);
+        mockMvc.perform(post("/api/auth/password").cookie(session).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"currentPassword\":\"test-password\",\"newPassword\":\"new-password-123\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    private ResultActions changePassword(Cookie session, String current, String next) throws Exception {
+        Cookie xsrf = xsrf(session);
+        return mockMvc.perform(post("/api/auth/password").cookie(session, xsrf).header("X-XSRF-TOKEN", xsrf.getValue())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"currentPassword\":\"" + current + "\",\"newPassword\":\"" + next + "\"}"));
     }
 
     // ---- helpers ----

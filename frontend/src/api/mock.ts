@@ -265,6 +265,15 @@ export const mockApi: Api = {
       if (!user) fail(401, 'INVALID_CREDENTIALS')
       return user
     }),
+  changePassword: ({ currentPassword, newPassword }) => delay(() => {
+    const user = sessionUser()
+    if (!user) fail(401, 'UNAUTHENTICATED')
+    const account = data().accounts.find((a) => a.loginId === user.loginId)!
+    if (account.password !== currentPassword) fail(400, 'CURRENT_PASSWORD_INCORRECT')
+    if (newPassword.length < 8 || !newPassword.trim() || new TextEncoder().encode(newPassword).length > 72 || newPassword === currentPassword) fail(400, 'INVALID_NEW_PASSWORD')
+    account.password = newPassword
+    data().session = null
+  }),
   logout: () =>
     delay(() => {
       data().session = null
