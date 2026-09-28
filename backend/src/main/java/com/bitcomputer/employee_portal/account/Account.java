@@ -55,6 +55,11 @@ public class Account {
         return new Account(loginId, passwordHash, Role.ADMIN, null);
     }
 
+    /** BCrypt 해시를 받는다. 검사(현재 비밀번호, 새 비밀번호 규칙)는 PasswordService 가 한다. */
+    public void changePassword(String encodedPassword) {
+        this.passwordHash = encodedPassword;
+    }
+
     /** 직원 계정의 아이디는 사번이다(F-d). */
     public static Account employee(Employee employee, String passwordHash) {
         return new Account(employee.getEmployeeNo(), passwordHash, Role.EMPLOYEE, employee);

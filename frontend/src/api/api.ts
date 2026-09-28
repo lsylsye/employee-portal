@@ -20,6 +20,7 @@ import type {
  */
 export type Api = {
   login(req: LoginRequest): Promise<SessionUser>
+  changePassword(req: { currentPassword: string; newPassword: string }): Promise<void>
   logout(): Promise<void>
   /** 로그인 안 되어 있으면 null */
   currentUser(): Promise<SessionUser | null>
@@ -59,6 +60,8 @@ export class ApiError extends Error {
  * 모르는 코드는 서버 메시지를 그대로 쓴다.
  */
 const MESSAGES: Record<string, string> = {
+  CURRENT_PASSWORD_INCORRECT: '현재 비밀번호가 올바르지 않아요.',
+  INVALID_NEW_PASSWORD: '새 비밀번호는 8자 이상, 72바이트 이하이며 현재 비밀번호와 달라야 해요.',
   INVALID_REQUEST: '입력한 값을 다시 확인해 주세요.',
   INVALID_CREDENTIALS: '아이디 또는 비밀번호가 올바르지 않아요.',
   UNAUTHENTICATED: '로그인이 필요해요.',

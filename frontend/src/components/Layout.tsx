@@ -1,4 +1,4 @@
-import { LogOut, ShieldX, UserRound, Users, type LucideIcon } from 'lucide-react'
+import { KeyRound, LogOut, ShieldX, UserRound, Users, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import type { Role } from '@/api'
@@ -10,8 +10,8 @@ type MenuItem = { to: string; label: string; icon: LucideIcon }
 
 // 역할별 메뉴. 직원은 내 정보 하나, 관리자는 직원 목록 하나
 const MENUS: Record<Role, MenuItem[]> = {
-  EMPLOYEE: [{ to: '/me', label: '내 정보', icon: UserRound }],
-  ADMIN: [{ to: '/admin', label: '직원 목록', icon: Users }],
+  EMPLOYEE: [{ to: '/me', label: '내 정보', icon: UserRound }, { to: '/me/password', label: '비밀번호 변경', icon: KeyRound }],
+  ADMIN: [{ to: '/admin', label: '직원 목록', icon: Users }, { to: '/admin/password', label: '비밀번호 변경', icon: KeyRound }],
 }
 
 /**
@@ -74,6 +74,7 @@ function Forbidden({ required, home }: { required: Role; home: Role }) {
 }
 
 function Sidebar() {
+  const location = useLocation()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -91,7 +92,7 @@ function Sidebar() {
             key={to}
             to={to}
             // 관리자 직원 목록은 상세·생성 화면에서도 선택된 상태로 둔다
-            end={false}
+            end={to === '/me' || (to === '/admin' && location.pathname === '/admin/password')}
             className={({ isActive }) =>
               `flex items-center gap-2 rounded-md px-2 py-2 text-sm ${
                 isActive ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60'
