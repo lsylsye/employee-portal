@@ -54,7 +54,7 @@ export function EmployeeListPage() {
                   <TableHead>성명</TableHead>
                   <TableHead>생년월일</TableHead>
                   <TableHead>재직 상태</TableHead>
-                  <TableHead>접근 차단일</TableHead>
+                  <TableHead>퇴사일</TableHead>
                   <TableHead>최근 신원 조회</TableHead>
                 </TableRow>
               </TableHeader>
