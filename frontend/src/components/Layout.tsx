@@ -1,8 +1,9 @@
-import { LogOut, UserRound, Users, type LucideIcon } from 'lucide-react'
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
+import { LogOut, ShieldX, UserRound, Users, type LucideIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 import type { Role } from '@/api'
 import { useAuth } from '@/auth/AuthContext'
-import { Loading } from '@/components/common'
+import { Loading, StatusPage } from '@/components/common'
 import { Button } from '@/components/ui/button'
 
 type MenuItem = { to: string; label: string; icon: LucideIcon }
@@ -29,17 +30,46 @@ export function RequireRole({ role }: { role: Role }) {
     )
   }
   if (user === null) return <Navigate to="/login" replace state={{ from: location.pathname }} />
-  if (user.role !== role) return <Navigate to={homeOf(user.role)} replace />
 
+  // 다른 역할의 페이지: 조용히 옮기지 않고, 주소를 그대로 둔 채 이유와 돌아갈 길을 보여 준다
+  return <AppShell>{user.role === role ? <Outlet /> : <Forbidden required={role} home={user.role} />}</AppShell>
+}
+
+function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-muted/40">
       <Sidebar />
       <main className="min-w-0 flex-1">
-        <div className="mx-auto max-w-5xl px-8 py-8">
-          <Outlet />
-        </div>
+        <div className="mx-auto max-w-5xl px-8 py-8">{children}</div>
       </main>
     </div>
+  )
+}
+
+const FORBIDDEN_REASON: Record<Role, string> = {
+  ADMIN: '이 페이지는 관리자만 볼 수 있어요. 필요한 정보가 있으면 인사 담당자에게 문의해 주세요.',
+  EMPLOYEE: '이 페이지는 직원 본인만 볼 수 있어요. 관리자 계정에는 직원 정보가 연결돼 있지 않아요.',
+}
+
+const HOME_LABEL: Record<Role, string> = {
+  EMPLOYEE: '내 정보로 가기',
+  ADMIN: '직원 목록으로 가기',
+}
+
+/** 403: 로그인은 됐지만 역할이 다른 페이지 */
+function Forbidden({ required, home }: { required: Role; home: Role }) {
+  return (
+    <StatusPage
+      icon={ShieldX}
+      code="403"
+      title="접근 권한이 없어요"
+      description={FORBIDDEN_REASON[required]}
+      action={
+        <Button asChild>
+          <Link to={homeOf(home)}>{HOME_LABEL[home]}</Link>
+        </Button>
+      }
+    />
   )
 }
 

@@ -1,4 +1,4 @@
-import { CircleAlert, Inbox, Loader2 } from 'lucide-react'
+import { CircleAlert, Inbox, Loader2, type LucideIcon } from 'lucide-react'
 import { type ComponentProps, type MouseEvent, type ReactElement, type ReactNode, useId, useState } from 'react'
 import {
   AlertDialog,
@@ -60,6 +60,36 @@ export function EmptyState({ title, description }: { title: string; description?
       <Inbox className="size-8 text-muted-foreground" aria-hidden />
       <p className="text-sm font-medium">{title}</p>
       {description && <p className="text-sm text-muted-foreground">{description}</p>}
+    </div>
+  )
+}
+
+/**
+ * 전체 화면 상태 안내(권한 없음, 페이지 없음). 사용자 잘못이나 시스템 오류가 아니라 안내라서
+ * 빨강을 쓰지 않고 회색 아이콘으로 둔다(README 디자인 규칙).
+ */
+export function StatusPage({
+  icon: Icon,
+  code,
+  title,
+  description,
+  action,
+}: {
+  icon: LucideIcon
+  code: string
+  title: string
+  description: ReactNode
+  action: ReactNode
+}) {
+  return (
+    <div className="flex flex-col items-center py-16 text-center">
+      <div className="flex size-16 items-center justify-center rounded-full bg-muted">
+        <Icon className="size-8 text-muted-foreground" aria-hidden />
+      </div>
+      <p className="mt-6 text-sm font-medium text-muted-foreground">{code}</p>
+      <h1 className="mt-2 text-2xl font-semibold tracking-tight">{title}</h1>
+      <p className="mt-2 max-w-md text-sm text-balance text-muted-foreground">{description}</p>
+      <div className="mt-8">{action}</div>
     </div>
   )
 }
