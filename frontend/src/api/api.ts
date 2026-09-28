@@ -32,10 +32,10 @@ export type Api = {
   getEmployee(employeeNo: string): Promise<EmployeeDetail>
   createEmployee(req: CreateEmployeeRequest): Promise<CreateEmployeeResponse>
   updateEmployee(employeeNo: string, req: UpdateEmployeeRequest): Promise<EmployeeDetail>
-  /** 접근 차단일 설정(퇴사 처리) */
+  /** 퇴사 처리·퇴사일 변경(효력 전만) */
   setAccessBlock(employeeNo: string, req: AccessBlockRequest): Promise<void>
-  /** 차단 취소(오입력 정정). 재입사는 새 사번으로 등록한다 */
-  cancelAccessBlock(employeeNo: string): Promise<void>
+  /** 계정 복구(퇴사 번복). 퇴사일부터 7일 안에서만. 지나면 영구 퇴사. 재입사는 새 사번으로 등록한다 */
+  recoverAccount(employeeNo: string): Promise<void>
 
   listBackgroundChecks(employeeNo: string): Promise<BgCheckSummary[]>
   requestBackgroundCheck(employeeNo: string): Promise<void>
@@ -65,6 +65,9 @@ const MESSAGES: Record<string, string> = {
   ACCESS_BLOCKED: '접근이 차단된 계정이에요.',
   FORBIDDEN: '권한이 없어요.',
   EMPLOYEE_NOT_FOUND: '직원을 찾을 수 없어요.',
+  RESIGNATION_ALREADY_EFFECTIVE: '이미 퇴사한 직원은 퇴사일을 바꿀 수 없어요. 복구 기간 안이면 계정 복구를 해 주세요.',
+  ACCOUNT_RECOVERY_NOT_AVAILABLE: '퇴사 처리된 직원만 계정을 복구할 수 있어요.',
+  ACCOUNT_RECOVERY_EXPIRED: '계정 복구 기간이 지나 영구 퇴사 처리됐어요.',
   BIRTH_DATE_IN_FUTURE: '생년월일은 오늘 이후일 수 없어요.',
   CSRF_INVALID: '보안 토큰이 만료됐어요. 페이지를 새로고침해 주세요.',
   BACKGROUND_CHECK_NOT_FOUND: '신원 조회 결과를 찾을 수 없어요.',

@@ -1,78 +1,30 @@
-# React + TypeScript + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + TypeScript + Vite. UI 는 shadcn/ui(Tailwind CSS v4). 빌드 결과는 백엔드 JAR 의 정적 파일로 들어간다(루트 Dockerfile).
 
-Currently, two official plugins are available:
+## 실행
+| 명령 | 설명 |
+|---|---|
+| `npm run dev` | 개발 서버. `/api` 는 로컬 백엔드(8080)로 프록시된다 |
+| `npm run dev:mock` | 백엔드 없이 목 API 로 실행(`VITE_USE_MOCK=true`). 목 계정: `admin` / `admin1234`, `EMP-003` / `password`. 목 데이터는 sessionStorage 에만 있다 |
+| `npm run build` | 타입 검사(`tsc -b`) + 빌드 |
+| `npm run lint` | ESLint |
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+목 API(`src/api/mock.ts`)는 배포 번들에 들어가지 않는다. 목에서는 EMP-010 의 신원 조회가 항상 "결과 미확인"으로 끝난다(빨간 배지 확인용).
 
-## React Compiler
+## 구조
+| 위치 | 내용 |
+|---|---|
+| `src/api/types.ts` | 백엔드 API 계약(타입). 필드 이름은 백엔드 DTO 와 같다 |
+| `src/api/http.ts`, `src/api/mock.ts` | 실제 구현과 목 구현(같은 `Api` 모양) |
+| `src/api/api.ts` | `Api` 타입, 오류 코드 → 해요체 문구 매핑 |
+| `src/pages/LoginPage.tsx` | 로그인 |
+| `src/pages/MyProfilePage.tsx` | 직원: 내 정보·연락처 수정·신원 조회 진행 상태 |
+| `src/pages/admin/*` | 관리자: 직원 목록·등록·상세(신원 정정, 퇴사 처리·계정 복구), 신원 조회 |
+| `src/components/status.tsx` | 재직·신원 조회 상태 배지(아래 색 규칙) |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
-
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
-```
+- 역할별 라우트 가드로 직원은 관리자 화면에 들어갈 수 없다. 최종 권한 검사는 백엔드가 한다.
+- 신원 조회 화면은 진행 중인 건이 있으면 3초마다 **우리 서버**를 다시 읽는다. 외부 API 는 백엔드만 부르므로 화면을 오래 열어 둬도 외부 호출이 늘지 않는다.
 
 ## 디자인 규칙
 

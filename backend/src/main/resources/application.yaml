@@ -42,6 +42,10 @@ springdoc:
   swagger-ui:
     enabled: false
 
+employee:
+  # 퇴사일부터 이 기간 안에는 계정 복구(퇴사 번복)를 할 수 있다. 지나면 영구 퇴사다. 회사 정책 값.
+  recovery-window: 7d
+
 bg:
   # 접근 차단일 + 이 기간이 지난 신원조회 결과는 조회 때 보여 주지 않는다(DECISIONS (3)).
   # 회사 정책 값이다(법적 근거 미확인). 실제 삭제(스케줄러)는 범위 밖이다.

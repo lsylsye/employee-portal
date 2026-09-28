@@ -183,9 +183,31 @@ function toSummary(e: MockEmployee): EmployeeSummary {
   return { ...base(e), latestCheckStatus: latest?.status ?? null, latestCheckRequestedAt: latest?.requestedAt ?? null }
 }
 
+/** 계정 복구 기간: 퇴사일부터 7일(서버 employee.recovery-window 와 같게) */
+const RECOVERY_DAYS = 7
+
+function plusDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+/** 복구할 수 있는 마지막 날. 퇴사 효력 후 7일 안이 아니면 null */
+function recoverableUntil(e: MockEmployee): string | null {
+  if (!e.accessBlockedOn || statusOf(e) !== 'BLOCKED') return null
+  return todayKst() < plusDays(e.accessBlockedOn, RECOVERY_DAYS) ? plusDays(e.accessBlockedOn, RECOVERY_DAYS - 1) : null
+}
+
 function toDetail(e: MockEmployee): EmployeeDetail {
   const account = data().accounts.find((a) => a.employeeNo === e.employeeNo)
-  return { ...base(e), ...contact(e), lastName: e.lastName, firstName: e.firstName, loginId: account?.loginId ?? null }
+  return {
+    ...base(e),
+    ...contact(e),
+    lastName: e.lastName,
+    firstName: e.firstName,
+    loginId: account?.loginId ?? null,
+    recoverableUntil: recoverableUntil(e),
+  }
 }
 
 function toProfile(e: MockEmployee): MyProfile {
@@ -316,13 +338,19 @@ export const mockApi: Api = {
   setAccessBlock: (no, req) =>
     delay(() => {
       requireRole('ADMIN')
-      if (!req.blockedOn) fail(400, 'INVALID_REQUEST', '접근 차단일을 입력해 주세요.')
-      findEmployee(no).accessBlockedOn = req.blockedOn
+      if (!req.blockedOn) fail(400, 'INVALID_REQUEST', '퇴사일을 입력해 주세요.')
+      const e = findEmployee(no)
+      // 서버와 같게: 퇴사 효력이 생긴 뒤에는 퇴사일을 바꿀 수 없다
+      if (statusOf(e) === 'BLOCKED') fail(409, 'RESIGNATION_ALREADY_EFFECTIVE')
+      e.accessBlockedOn = req.blockedOn
     }),
-  cancelAccessBlock: (no) =>
+  recoverAccount: (no) =>
     delay(() => {
       requireRole('ADMIN')
-      findEmployee(no).accessBlockedOn = null
+      const e = findEmployee(no)
+      if (statusOf(e) !== 'BLOCKED') fail(409, 'ACCOUNT_RECOVERY_NOT_AVAILABLE')
+      if (!recoverableUntil(e)) fail(409, 'ACCOUNT_RECOVERY_EXPIRED')
+      e.accessBlockedOn = null
     }),
 
   listBackgroundChecks: (no) =>

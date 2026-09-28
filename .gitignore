@@ -30,3 +30,11 @@ backend/src/main/resources/static/
 # 레퍼런스 자료 (로컬 전용). 프론트 폴더 안 캡처(철자 caputre 그대로)도 포함
 /capture/
 /frontend/caputre/
+
+# 레포(GitHub)에 올리지 않는 로컬 전용 문서 (배포 이미지에는 원래 들어가지 않는다: Dockerfile 은 backend/·frontend/ 만 복사)
+# - docs/: 참고 문서(API 목록, 구조 설명, 초기 요구사항 분석, ERD 원본)와 AI 대화 원문
+# - measurements/: BG API 실측 코드와 원자료. 결과와 근거는 루트 MEASUREMENTS.md 에 있다
+# - 제출물/: 과제 형식에 맞춘 제출용 사본
+/docs/
+/measurements/
+/제출물/

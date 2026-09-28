@@ -39,6 +39,7 @@ public class AdminEmployeeService {
     private final FindByIndexNameSessionRepository<? extends Session> sessionRepository;
     private final EmployeeChangeRecorder changeRecorder;
     private final BackgroundCheckProperties backgroundCheckProperties;
+    private final EmployeeProperties employeeProperties;
     private final Clock clock;
 
     /** 직원별 최신 신원조회 상태까지 쿼리 한 번으로 가져온다(EmployeeRepository.findAllWithLatestCheck). */
@@ -82,13 +83,17 @@ public class AdminEmployeeService {
     }
 
     /**
-     * 퇴사 처리. 차단일이 오늘(KST) 이하면 그 직원의 세션 행을 바로 지운다.
+     * 퇴사 처리와 퇴사일 변경. 차단일이 오늘(KST) 이하면 그 직원의 세션 행을 바로 지운다.
      * 미래 날짜(예약)는 지우지 않는다. 그날이 되면 AccessBlockFilter 가 다음 요청에서 막고 세션을 지운다.
+     * 이미 퇴사 효력이 생긴 직원은 퇴사일을 바꿀 수 없다(409). 먼 미래로 옮겨 사실상 취소하는 우회를 막는다.
      */
     public Detail blockAccess(String employeeNo, AccessBlockRequest request, String actorLoginId) {
         LocalDate today = today();
         LocalDate blockedOn = request == null || request.blockedOn() == null ? today : request.blockedOn();
         Employee employee = find(employeeNo);
+        if (!employee.canChangeResignationDate(today)) {
+            throw new ApiException(ErrorCode.RESIGNATION_ALREADY_EFFECTIVE);
+        }
         Instant now = clock.instant();
         changeRecorder.record(employee, actorLoginId, employee.blockAccessFrom(blockedOn, now), now);
 
@@ -100,12 +105,22 @@ public class AdminEmployeeService {
         return detail(employee);
     }
 
-    /** 차단 취소(오입력 정정). 이미 파기된 BG 결과는 돌아오지 않는다. */
-    public Detail cancelAccessBlock(String employeeNo, String actorLoginId) {
+    /**
+     * 계정 복구(퇴사 번복). 퇴사 효력이 생긴 뒤 복구 기간(기본 7일) 안에서만 된다. 지나면 영구 퇴사다.
+     * 퇴사 예정(효력 전)은 복구가 아니라 퇴사일 변경으로 조정한다. 세션은 되살리지 않는다(다시 로그인).
+     */
+    public Detail recoverAccount(String employeeNo, String actorLoginId) {
+        LocalDate today = today();
         Employee employee = find(employeeNo);
+        if (!employee.isAccessBlockedOn(today)) {
+            throw new ApiException(ErrorCode.ACCOUNT_RECOVERY_NOT_AVAILABLE);
+        }
+        if (!employee.canRecover(today, employeeProperties.recoveryWindow())) {
+            throw new ApiException(ErrorCode.ACCOUNT_RECOVERY_EXPIRED);
+        }
         Instant now = clock.instant();
-        changeRecorder.record(employee, actorLoginId, employee.cancelAccessBlock(now), now);
-        log.info("차단 취소: {}", employeeNo);
+        changeRecorder.record(employee, actorLoginId, employee.recover(now), now);
+        log.info("계정 복구: {}", employeeNo);
         return detail(employee);
     }
 
@@ -124,7 +139,7 @@ public class AdminEmployeeService {
     }
 
     private Detail detail(Employee employee, String loginId) {
-        return Detail.of(employee, loginId, today());
+        return Detail.of(employee, loginId, today(), employeeProperties.recoveryWindow());
     }
 
     private void validateBirthDate(LocalDate birthDate) {

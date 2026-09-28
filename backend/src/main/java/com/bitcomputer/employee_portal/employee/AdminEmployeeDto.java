@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.Period;
 
 /** 관리자 직원 API 의 요청·응답 */
 public final class AdminEmployeeDto {
@@ -33,13 +34,14 @@ public final class AdminEmployeeDto {
         }
     }
 
+    /** recoverableUntil: 계정 복구를 할 수 있는 마지막 날(KST). 복구할 수 없는 상태면 null. */
     public record Detail(String employeeNo, String fullName, String lastName, String firstName, LocalDate birthDate,
                          String phone, String email, String address, String emergencyContact,
-                         EmploymentStatus status, LocalDate accessBlockedOn, String loginId) {
-        static Detail of(Employee e, String loginId, LocalDate today) {
+                         EmploymentStatus status, LocalDate accessBlockedOn, LocalDate recoverableUntil, String loginId) {
+        static Detail of(Employee e, String loginId, LocalDate today, Period recoveryWindow) {
             return new Detail(e.getEmployeeNo(), e.getFullName(), e.getLastName(), e.getFirstName(), e.getBirthDate(),
                     e.getPhone(), e.getEmail(), e.getAddress(), e.getEmergencyContact(),
-                    e.statusOn(today), e.getAccessBlockedOn(), loginId);
+                    e.statusOn(today), e.getAccessBlockedOn(), e.recoverableUntil(today, recoveryWindow), loginId);
         }
     }
 
@@ -72,7 +74,7 @@ public final class AdminEmployeeDto {
         }
     }
 
-    /** blockedOn 을 비우면 오늘(KST)이다. 그날 00:00 KST 부터 차단된다. */
+    /** 퇴사일. 비우면 오늘(KST)이다. 그날 00:00 KST 부터 차단된다. 이미 퇴사한 직원은 바꿀 수 없다(409). */
     public record AccessBlockRequest(LocalDate blockedOn) {
     }
 }

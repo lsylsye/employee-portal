@@ -121,9 +121,26 @@ public class Employee {
         return changeAccessBlockedOn(blockedOn, now);
     }
 
-    /** 차단 취소. 오입력 정정용이다(재입사는 새 사번으로 등록한다). */
-    public Set<String> cancelAccessBlock(Instant now) {
+    /**
+     * 계정 복구(퇴사 번복). 퇴사일부터 복구 기간 안에서만 부른다(canRecover). 재입사는 새 사번으로 등록한다.
+     */
+    public Set<String> recover(Instant now) {
         return changeAccessBlockedOn(null, now);
+    }
+
+    /** 퇴사일 변경은 효력이 생기기 전(퇴사 예정)이나 재직 중에만 된다. 이미 퇴사했으면 복구만 가능하다. */
+    public boolean canChangeResignationDate(LocalDate today) {
+        return !isAccessBlockedOn(today);
+    }
+
+    /** 퇴사 효력이 생긴 뒤, 퇴사일 + 복구 기간 전까지만 복구할 수 있다. */
+    public boolean canRecover(LocalDate today, Period recoveryWindow) {
+        return isAccessBlockedOn(today) && today.isBefore(accessBlockedOn.plus(recoveryWindow));
+    }
+
+    /** 복구할 수 있는 마지막 날(KST). 복구할 수 없는 상태면 null. */
+    public LocalDate recoverableUntil(LocalDate today, Period recoveryWindow) {
+        return canRecover(today, recoveryWindow) ? accessBlockedOn.plus(recoveryWindow).minusDays(1) : null;
     }
 
     private Set<String> changeAccessBlockedOn(LocalDate blockedOn, Instant now) {

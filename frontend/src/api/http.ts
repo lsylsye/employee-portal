@@ -70,7 +70,7 @@ export const httpApi: Api = {
   createEmployee: (req) => request('POST', '/api/admin/employees', req),
   updateEmployee: (no, req) => request('PATCH', employee(no), req),
   setAccessBlock: (no, req) => request('PUT', `${employee(no)}/access-block`, req),
-  cancelAccessBlock: (no) => request('DELETE', `${employee(no)}/access-block`),
+  recoverAccount: (no) => request('DELETE', `${employee(no)}/access-block`),
 
   listBackgroundChecks: (no) => request('GET', `${employee(no)}/background-checks`),
   requestBackgroundCheck: (no) => request('POST', `${employee(no)}/background-checks`),

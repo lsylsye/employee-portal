@@ -150,9 +150,11 @@ function IdentityForm({ employee, onCancel, onSaved }: { employee: EmployeeDetai
 }
 
 /**
- * 위험 영역: 퇴사 처리 (DECISIONS 1). 입력한 날짜 00:00 KST 부터 접근을 막는다.
+ * 위험 영역: 퇴사 처리 (DECISIONS 1). 퇴사일 00:00 KST 부터 접근을 막는다.
  * 오늘이면 즉시(기존 세션도 끊김), 미래면 예약. 레코드는 지우지 않는다.
- * 차단 취소는 오입력 정정용이다. 재입사는 새 사번으로 등록한다.
+ * - 퇴사 예정(효력 전): 퇴사일만 바꿀 수 있다. 취소는 없다.
+ * - 퇴사 후 7일 안: 계정 복구(퇴사 번복)만 할 수 있다. 지나면 영구 퇴사.
+ * 재입사는 새 사번으로 등록한다.
  */
 function DangerZone({ employee, onChanged }: { employee: EmployeeDetail; onChanged: () => Promise<void> }) {
   const [date, setDate] = useState(employee.accessBlockedOn ?? todayKst())
@@ -162,28 +164,19 @@ function DangerZone({ employee, onChanged }: { employee: EmployeeDetail; onChang
   const scheduled = employee.status === 'BLOCK_SCHEDULED'
   const immediate = date !== '' && date <= todayKst()
   const who = `${employee.fullName}(${employee.employeeNo})`
+  const permanentNotice = '퇴사일부터 7일이 지나면 계정을 복구할 수 없고 영구 퇴사 처리돼요.'
 
   async function block() {
     await api.setAccessBlock(employee.employeeNo, { blockedOn: date })
     await onChanged()
-    toast.success(immediate ? `${employee.fullName}님의 접근을 막았어요.` : `${date}부터 접근을 막도록 예약했어요.`)
+    toast.success(immediate ? `${employee.fullName}님을 퇴사 처리했어요.` : `${date}부터 퇴사 처리되도록 예약했어요.`)
   }
 
-  async function cancel() {
-    await api.cancelAccessBlock(employee.employeeNo)
+  async function recover() {
+    await api.recoverAccount(employee.employeeNo)
     await onChanged()
-    toast.success('접근 차단을 취소했어요.')
+    toast.success(`${employee.fullName}님의 계정을 복구했어요. 다시 로그인하면 쓸 수 있어요.`)
   }
-
-  const cancelButton = (
-    <ConfirmDialog
-      trigger={<Button variant="outline">차단 취소하기</Button>}
-      title="접근 차단을 취소할까요?"
-      description={`${who}님의 접근 차단일(${employee.accessBlockedOn})을 지워요. 잘못 입력한 경우에만 쓰고, 다시 입사한 직원은 새 사번으로 등록해 주세요.`}
-      confirmLabel="차단 취소하기"
-      onConfirm={cancel}
-    />
-  )
 
   return (
     <Card className="ring-destructive/30">
@@ -191,20 +184,30 @@ function DangerZone({ employee, onChanged }: { employee: EmployeeDetail; onChang
         <CardTitle className="text-destructive">위험 영역</CardTitle>
         <CardDescription>
           {blocked
-            ? `${employee.accessBlockedOn}부터 접근이 막혀 있어요. 다시 입사하면 새 사번으로 등록해 주세요.`
+            ? employee.recoverableUntil
+              ? `${employee.accessBlockedOn}에 퇴사 처리됐어요. ${employee.recoverableUntil}까지 계정을 복구할 수 있고, 그 뒤로는 영구 퇴사예요.`
+              : `${employee.accessBlockedOn}에 퇴사 처리됐고 복구 기간이 지나 영구 퇴사예요. 다시 입사하면 새 사번으로 등록해 주세요.`
             : scheduled
-              ? `${employee.accessBlockedOn}부터 접근이 막힐 예정이에요. 날짜를 바꾸거나 취소할 수 있어요.`
-              : '접근 차단일 00:00(한국 시간)부터 로그인할 수 없어요. 오늘로 하면 로그인 중인 세션도 바로 끊겨요.'}
+              ? `${employee.accessBlockedOn}부터 퇴사 처리될 예정이에요. 퇴사일은 바꿀 수 있지만 취소할 수는 없어요.`
+              : `퇴사일 00:00(한국 시간)부터 로그인할 수 없어요. 오늘로 하면 로그인 중인 세션도 바로 끊겨요. ${permanentNotice}`}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-end gap-4">
         {blocked ? (
-          cancelButton
+          employee.recoverableUntil && (
+            <ConfirmDialog
+              trigger={<Button variant="outline">계정 복구하기</Button>}
+              title="계정을 복구할까요?"
+              description={`${who}님의 퇴사 처리를 되돌려 재직 상태로 바꿔요. 잘못 퇴사 처리한 경우에만 써 주세요. ${employee.recoverableUntil}이 지나면 복구할 수 없어요.`}
+              confirmLabel="계정 복구하기"
+              onConfirm={recover}
+            />
+          )
         ) : (
           <>
             <div className="w-56">
               <Field
-                label="접근 차단일"
+                label="퇴사일"
                 type="date"
                 value={date}
                 onChange={(e) => {
@@ -221,24 +224,24 @@ function DangerZone({ employee, onChanged }: { employee: EmployeeDetail; onChang
                   onClick={(e) => {
                     if (!date) {
                       e.preventDefault()
-                      setDateError('접근 차단일을 입력해 주세요.')
+                      setDateError('퇴사일을 입력해 주세요.')
                     }
                   }}
                 >
-                  {scheduled ? '차단일 바꾸기' : '퇴사 처리하기'}
+                  {scheduled ? '퇴사일 바꾸기' : '퇴사 처리하기'}
                 </Button>
               }
               destructive
-              title={immediate ? '지금 바로 접근을 막을까요?' : `${date}부터 접근을 막을까요?`}
+              title={immediate ? '지금 바로 퇴사 처리할까요?' : `${date}부터 퇴사 처리할까요?`}
               description={
-                immediate
-                  ? `${who}님은 바로 로그인할 수 없고, 로그인 중인 세션도 끊겨요. 기록은 지우지 않아요.`
-                  : `${who}님은 ${date} 00:00(한국 시간)부터 로그인할 수 없어요. 그 전까지는 지금처럼 쓸 수 있어요.`
+                (immediate
+                  ? `${who}님은 바로 로그인할 수 없고, 로그인 중인 세션도 끊겨요. 기록은 지우지 않아요. `
+                  : `${who}님은 ${date} 00:00(한국 시간)부터 로그인할 수 없어요. 그 전까지는 퇴사일만 바꿀 수 있어요. `) +
+                permanentNotice
               }
-              confirmLabel={immediate ? '접근 막기' : '예약하기'}
+              confirmLabel={immediate ? '퇴사 처리하기' : '예약하기'}
               onConfirm={block}
             />
-            {scheduled && cancelButton}
           </>
         )}
       </CardContent>

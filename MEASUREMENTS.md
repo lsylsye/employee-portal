@@ -1,7 +1,7 @@
 # MEASUREMENTS.md — Background Check API 실측 결과
 
-> 모든 수치는 `measurements/analyze.js`가 원자료(`measurements/raw/run1-*.ndjson`)에서 계산했다. 손으로 계산한 값은 없다.
-> 전체 결과표: `measurements/results/run1.md` · 실측 설계: `measurements/DESIGN.md`
+> 모든 수치는 실측 분석 스크립트(`analyze.js`)가 원자료(run1, NDJSON)에서 계산했다. 손으로 계산한 값은 없다.
+> 실측 코드·원자료·전체 결과표는 레포에 포함하지 않았다(로컬 `measurements/`). 과제 요구 항목과 결론은 이 문서에 모두 있다.
 > 표기: 비율은 `값 [95% Wilson 신뢰구간]`, **n = 표본 수**
 
 ## 측정 조건

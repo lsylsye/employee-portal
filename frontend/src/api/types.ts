@@ -46,7 +46,7 @@ export type UpdateMyProfileRequest = { [K in keyof ContactFields]: string }
 export type MyBackgroundCheck = { requestedAt: string; progress: 'IN_PROGRESS' | 'COMPLETED' | 'NOT_COMPLETED' }
 
 /**
- * 재직 상태. 저장하지 않고 접근 차단일과 오늘(KST)로 계산한다(DECISIONS 1).
+ * 재직 상태. 저장하지 않고 퇴사일(접근 차단일)과 오늘(KST)로 계산한다(DECISIONS 1).
  * - ACTIVE 재직: 차단일 없음
  * - BLOCK_SCHEDULED 차단 예정: 차단일 > 오늘
  * - BLOCKED 차단: 차단일 <= 오늘
@@ -86,6 +86,8 @@ export type EmployeeDetail = EmployeeBase &
     firstName: string
     /** 계정이 없으면 null (시드 9명은 계정 없음) */
     loginId: string | null
+    /** 계정 복구(퇴사 번복)를 할 수 있는 마지막 날(KST). 퇴사일부터 7일. 복구할 수 없는 상태(재직·퇴사 예정·영구 퇴사)면 null */
+    recoverableUntil: string | null
   }
 
 /**
@@ -116,7 +118,10 @@ export type UpdateEmployeeRequest = {
   birthDate: string | null
 }
 
-/** PUT /api/admin/employees/{employeeNo}/access-block. 그날 00:00 KST 부터 차단. 응답은 Detail(화면은 다시 읽는다) */
+/**
+ * PUT /api/admin/employees/{employeeNo}/access-block: 퇴사 처리·퇴사일 변경. 그날 00:00 KST 부터 차단. 응답은 Detail(화면은 다시 읽는다).
+ * 이미 퇴사 효력이 생긴 직원은 퇴사일을 바꿀 수 없다(409 RESIGNATION_ALREADY_EFFECTIVE).
+ */
 export type AccessBlockRequest = { blockedOn: string }
 
 /** GET /api/admin/employees/{employeeNo}/background-checks 항목(BackgroundCheckDto.HistoryItem). 판정만, 최신순 */

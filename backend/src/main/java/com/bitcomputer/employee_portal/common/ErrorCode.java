@@ -22,6 +22,11 @@ public enum ErrorCode {
     ACCESS_BLOCKED(HttpStatus.UNAUTHORIZED, "접근이 차단된 계정입니다"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없습니다"),
     EMPLOYEE_NOT_FOUND(HttpStatus.NOT_FOUND, "직원을 찾을 수 없습니다"),
+    /** 퇴사 효력이 생긴 뒤에는 퇴사일을 바꿀 수 없다(복구 기간 안이면 계정 복구만 가능). */
+    RESIGNATION_ALREADY_EFFECTIVE(HttpStatus.CONFLICT, "이미 퇴사한 직원은 퇴사일을 바꿀 수 없습니다"),
+    /** 재직·퇴사 예정 상태는 복구할 것이 없다(퇴사 예정은 퇴사일 변경으로 조정한다). */
+    ACCOUNT_RECOVERY_NOT_AVAILABLE(HttpStatus.CONFLICT, "퇴사 처리된 직원만 계정을 복구할 수 있습니다"),
+    ACCOUNT_RECOVERY_EXPIRED(HttpStatus.CONFLICT, "계정 복구 기간이 지나 영구 퇴사 처리되었습니다"),
     BIRTH_DATE_IN_FUTURE(HttpStatus.BAD_REQUEST, "생년월일은 오늘 이후일 수 없습니다"),
     BACKGROUND_CHECK_NOT_FOUND(HttpStatus.NOT_FOUND, "신원조회 결과를 찾을 수 없습니다"),
     BACKGROUND_CHECK_IN_PROGRESS(HttpStatus.CONFLICT, "이미 진행 중인 신원조회가 있습니다"),

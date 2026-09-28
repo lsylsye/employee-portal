@@ -1,9 +1,0 @@
-{
-  "name": "bg-api-measurements",
-  "private": true,
-  "type": "module",
-  "description": "Background Check API 실측 스크립트 (Node 22 내장 fetch, 외부 의존성 없음)",
-  "engines": {
-    "node": ">=22"
-  }
-}
