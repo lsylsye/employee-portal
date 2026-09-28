@@ -158,7 +158,7 @@ function ContactForm({ profile, onCancel, onSaved }: { profile: MyProfile; onCan
         <Field label="이메일" type="email" value={form.email} onChange={set('email')} />
       </div>
       <Field label="주소" value={form.address} onChange={set('address')} />
-      <Field label="비상연락처" value={form.emergencyContact} onChange={set('emergencyContact')} hint="이름과 관계, 전화번호를 함께 적어 주세요." />
+      <Field label="비상연락처" type="tel" value={form.emergencyContact} onChange={set('emergencyContact')} />
       {error && <InlineError>{error}</InlineError>}
       <div className="flex gap-2">
         <Button type="submit" disabled={submitting}>
