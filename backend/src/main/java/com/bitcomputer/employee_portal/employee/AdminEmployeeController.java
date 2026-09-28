@@ -57,16 +57,16 @@ public class AdminEmployeeController {
         return adminEmployeeService.update(employeeNo, request, principal.getLoginId());
     }
 
-    /** 퇴사 처리. 본문을 비우면 오늘(KST)부터 차단한다. */
+    /** 퇴사 처리·퇴사일 변경. 본문을 비우면 오늘(KST)부터 차단한다. 이미 퇴사했으면 409. */
     @PutMapping("/{employeeNo}/access-block")
     Detail blockAccess(@PathVariable String employeeNo, @RequestBody(required = false) AccessBlockRequest request,
                        @AuthenticationPrincipal AccountPrincipal principal) {
         return adminEmployeeService.blockAccess(employeeNo, request, principal.getLoginId());
     }
 
-    /** 차단 취소(오입력 정정) */
+    /** 계정 복구(퇴사 번복). 퇴사일부터 7일(설정값) 안에서만 된다. 지나면 409(영구 퇴사). */
     @DeleteMapping("/{employeeNo}/access-block")
-    Detail cancelAccessBlock(@PathVariable String employeeNo, @AuthenticationPrincipal AccountPrincipal principal) {
-        return adminEmployeeService.cancelAccessBlock(employeeNo, principal.getLoginId());
+    Detail recoverAccount(@PathVariable String employeeNo, @AuthenticationPrincipal AccountPrincipal principal) {
+        return adminEmployeeService.recoverAccount(employeeNo, principal.getLoginId());
     }
 }

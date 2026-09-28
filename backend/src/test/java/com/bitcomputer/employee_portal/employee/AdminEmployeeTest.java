@@ -192,15 +192,62 @@ class AdminEmployeeTest {
     }
 
     @Test
-    void 차단을_취소하면_다시_로그인할_수_있다() throws Exception {
+    void 퇴사_후_7일_안에는_계정을_복구해_다시_로그인할_수_있다() throws Exception {
         String[] account = registerAndGetCredentials();
-        admin.send(put("/api/admin/employees/" + account[0] + "/access-block")).andExpect(status().isOk());
+        admin.send(put("/api/admin/employees/" + account[0] + "/access-block"))
+                .andExpect(jsonPath("$.recoverableUntil").value("2026-10-07")); // 10/1 퇴사 → 10/7까지
 
+        clock.set(Instant.parse("2026-10-07T14:59:59Z")); // KST 10/7 23:59:59
         admin.send(delete("/api/admin/employees/" + account[0] + "/access-block"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.accessBlockedOn").doesNotExist());
+                .andExpect(jsonPath("$.accessBlockedOn").doesNotExist())
+                .andExpect(jsonPath("$.recoverableUntil").doesNotExist());
         ApiSession.login(mockMvc, account[0], account[1]).send(get("/api/auth/me")).andExpect(status().isOk());
+    }
+
+    @Test
+    void 퇴사일_7일이_지나면_영구_퇴사라_복구도_퇴사일_변경도_409() throws Exception {
+        String[] account = registerAndGetCredentials();
+        admin.send(put("/api/admin/employees/" + account[0] + "/access-block")).andExpect(status().isOk());
+
+        clock.set(Instant.parse("2026-10-07T15:00:00Z")); // KST 10/8 00:00
+        admin.send(delete("/api/admin/employees/" + account[0] + "/access-block"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_RECOVERY_EXPIRED"));
+        admin.send(put("/api/admin/employees/" + account[0] + "/access-block").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"blockedOn\":\"2099-01-01\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RESIGNATION_ALREADY_EFFECTIVE"));
+        admin.send(get("/api/admin/employees/" + account[0]))
+                .andExpect(jsonPath("$.status").value("BLOCKED"))
+                .andExpect(jsonPath("$.recoverableUntil").doesNotExist());
+    }
+
+    @Test
+    void 이미_퇴사한_직원의_퇴사일을_미래로_옮겨_사실상_취소할_수_없다() throws Exception {
+        String[] account = registerAndGetCredentials();
+        admin.send(put("/api/admin/employees/" + account[0] + "/access-block")).andExpect(status().isOk());
+
+        admin.send(put("/api/admin/employees/" + account[0] + "/access-block").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"blockedOn\":\"2099-01-01\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RESIGNATION_ALREADY_EFFECTIVE"));
+    }
+
+    @Test
+    void 퇴사_예정은_퇴사일을_바꿀_수_있고_복구_대상이_아니다() throws Exception {
+        String[] account = registerAndGetCredentials();
+        admin.send(put("/api/admin/employees/" + account[0] + "/access-block").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"blockedOn\":\"2026-10-10\"}")).andExpect(jsonPath("$.status").value("BLOCK_SCHEDULED"));
+
+        admin.send(put("/api/admin/employees/" + account[0] + "/access-block").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"blockedOn\":\"2026-10-20\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessBlockedOn").value("2026-10-20"));
+        admin.send(delete("/api/admin/employees/" + account[0] + "/access-block"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_RECOVERY_NOT_AVAILABLE"));
     }
 
     @Test
