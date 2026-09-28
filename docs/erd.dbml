@@ -1,0 +1,85 @@
+// ERD 원본 (DBML). https://dbdiagram.io 에 붙여 넣으면 다이어그램이 그려진다.
+// 기준: Flyway V1~V7. 삭제 정책은 모두 RESTRICT(spring_session_attributes 만 CASCADE).
+
+Table employee {
+  id bigserial [pk]
+  employee_no varchar(20) [not null, unique, note: '사번. 신규는 시퀀스 EMP-011~']
+  full_name varchar(50) [not null, note: '원문 성명. CHECK full_name = last_name || first_name (의도한 비정규화)']
+  last_name varchar(20) [not null, note: '성 (BG lastName)']
+  first_name varchar(30) [not null, note: '이름 (BG firstName)']
+  birth_date date [note: 'NULL = 확인되지 않음(EMP-007)']
+  phone varchar(20)
+  email varchar(100)
+  address varchar(200)
+  emergency_contact varchar(100)
+  access_blocked_on date [note: '퇴사일(접근 차단일). 이날 00:00 KST 부터 차단. NULL = 재직']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table account {
+  id bigserial [pk]
+  login_id varchar(50) [not null, unique, note: '직원 = 사번, 관리자 = admin']
+  password_hash varchar(100) [not null, note: 'BCrypt']
+  role varchar(20) [not null, note: 'ADMIN | EMPLOYEE. CHECK: ADMIN ⇔ employee_id NULL']
+  employee_id bigint [unique, note: '직원:계정 = 1:0..1. 관리자는 NULL']
+  created_at timestamptz [not null]
+}
+
+Table background_check {
+  id bigserial [pk]
+  employee_id bigint [not null]
+  check_id varchar(64) [unique, note: '외부 checkId. POST 성공 전에는 NULL']
+  status varchar(20) [not null, note: 'PENDING | CLEAR | FLAGGED | UNRESOLVED | FAILED']
+  criminal_record boolean [note: '최종 판정일 때만']
+  education_verified boolean
+  employment_verified boolean
+  requested_by bigint [not null, note: '실행한 관리자']
+  requested_at timestamptz [not null]
+  completed_at timestamptz
+  poll_count int [not null, default: 0]
+  last_polled_at timestamptz
+  failure_reason varchar(40)
+
+  indexes {
+    (employee_id, requested_at) [note: 'employee_id, requested_at DESC']
+    requested_at [note: "부분 인덱스 WHERE status = 'PENDING'"]
+    employee_id [unique, note: "조건부 유니크 WHERE status = 'PENDING' (직원당 진행 중 1건)"]
+  }
+  Note: 'creditScore 는 저장하지 않는다(최소 수집)'
+}
+
+Table employee_change_log {
+  id bigserial [pk]
+  employee_id bigint [not null]
+  changed_by bigint [not null, note: '수정한 계정(본인 또는 관리자)']
+  field_name varchar(40) [not null, note: '바뀐 필드 이름만. 값은 저장하지 않는다']
+  changed_at timestamptz [not null]
+
+  indexes {
+    (employee_id, changed_at) [note: 'employee_id, changed_at DESC']
+  }
+}
+
+Table spring_session {
+  primary_id char(36) [pk]
+  session_id char(36) [not null, unique]
+  creation_time bigint [not null]
+  last_access_time bigint [not null]
+  max_inactive_interval int [not null]
+  expiry_time bigint [not null]
+  principal_name varchar(100) [note: '= account.login_id (FK 아님). 퇴사 처리 시 이 값으로 세션 삭제']
+}
+
+Table spring_session_attributes {
+  session_primary_id char(36) [pk]
+  attribute_name varchar(200) [pk]
+  attribute_bytes bytea [not null]
+}
+
+Ref: account.employee_id - employee.id [delete: restrict]
+Ref: background_check.employee_id > employee.id [delete: restrict]
+Ref: background_check.requested_by > account.id [delete: restrict]
+Ref: employee_change_log.employee_id > employee.id [delete: restrict]
+Ref: employee_change_log.changed_by > account.id [delete: restrict]
+Ref: spring_session_attributes.session_primary_id > spring_session.primary_id [delete: cascade]

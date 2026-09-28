@@ -1,6 +1,7 @@
 # 요구사항 정리 — 기능 / 비기능 / 명세 문제
 
 > 과제 원문(InterviewTasks.txt)과 swagger.yaml(v1.1.0), 키 확인 호출(목록 GET 약 6회)을 바탕으로 정리했다.
+> **작업 초기의 분석 문서다.** ⚠️ 항목의 최종 결정은 [DECISIONS.md](../DECISIONS.md), 🔬 항목의 실측 결과는 [MEASUREMENTS.md](../MEASUREMENTS.md), 구현 결과는 [README](../README.md)·[api.md](api.md)·[architecture.md](architecture.md)에 있다. 이 문서의 일부 방향(예: 신원 조회 열람 기록)은 이후 바뀌었다.
 > ⚠️ 표시는 원문에 명시되지 않아 **판단이 필요한 것**, 🔬 표시는 **실측으로 확인할 것**이다.
 
 ---
