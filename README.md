@@ -15,16 +15,11 @@
 ## 테스트 계정
 | 역할 | 아이디 | 비밀번호 |
 |---|---|---|
-| 관리자 | `admin` | 제출 메일로 전달 |
-| 직원 | `EMP-003` | 제출 메일로 전달 |
+| 관리자 | `admin` | bitcomputer928! |
+| 직원 | `EMP-003` | bitcomputer928! |
 
-- 비밀번호는 레포에 적지 않는다(public 레포). 계정은 평가자끼리 공유한다.
-- 시드 직원 10명 중 EMP-003만 계정이 있다. 다른 직원으로 로그인하려면 관리자 화면에서 새 직원을 등록한다(임시 비밀번호 발급).
-- **퇴사 처리는 새로 등록한 직원으로 시험해 달라.** 퇴사일부터 7일이 지나면 영구 퇴사되어 복구할 수 없다.
 
 ## ERD
 
-<!-- ERD 이미지를 여기에 넣는다 -->
+<img width="1352" height="874" alt="Untitled" src="https://github.com/user-attachments/assets/6812cef1-04b9-403c-b53e-cdd2ac23a85b" />
 
-## 문서
-- [DECISIONS.md](DECISIONS.md) 설계 판단 · [MEASUREMENTS.md](MEASUREMENTS.md) BG API 실측 · [AI_LOG.md](AI_LOG.md) AI 협업 기록
