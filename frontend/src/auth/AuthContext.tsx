@@ -1,10 +1,14 @@
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react'
-import { api, type LoginRequest, type SessionUser } from '../api'
+import { api, ApiError, messageOf, type LoginRequest, type Role, type SessionUser } from '../api'
 
 type AuthState = {
   /** undefined: 아직 확인 중, null: 로그인 안 됨 */
   user: SessionUser | null | undefined
-  login(req: LoginRequest): Promise<SessionUser>
+  /**
+   * 로그인. expectedRole 은 로그인 화면에서 고른 역할이다.
+   * 실제 계정 역할과 다르면 세션을 바로 닫고, 일반 로그인 실패와 같은 오류를 던진다(메시지 통일, DECISIONS 1).
+   */
+  login(req: LoginRequest, expectedRole: Role): Promise<SessionUser>
   logout(): Promise<void>
   /** API 가 401 을 주면 호출한다. 퇴사 처리로 세션이 끊긴 경우도 여기로 온다 */
   sessionExpired(): void
@@ -22,8 +26,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => setUser(null))
   }, [])
 
-  const login = useCallback(async (req: LoginRequest) => {
+  const login = useCallback(async (req: LoginRequest, expectedRole: Role) => {
     const u = await api.login(req)
+    if (u.role !== expectedRole) {
+      // 사용자 상태에 올리기 전에 검사해서 화면이 다른 역할로 넘어가지 않게 한다
+      await api.logout().catch(() => undefined)
+      throw new ApiError(401, 'INVALID_CREDENTIALS', messageOf('INVALID_CREDENTIALS', undefined, 401))
+    }
     setUser(u)
     return u
   }, [])
