@@ -6,5 +6,5 @@ import { mockApi } from './mock'
 // 배포 빌드는 기본값이 실제 API 다.
 export const api: Api = import.meta.env.VITE_USE_MOCK === 'true' ? mockApi : httpApi
 
-export { ApiError } from './api'
+export { ApiError, messageOf } from './api'
 export type * from './types'
